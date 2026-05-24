@@ -1,0 +1,63 @@
+[2026-05-20T05:19:19.067Z] EXTRACT_PDF: Processing container ECMU5463875
+[2026-05-20T05:19:19.069Z] EXTRACT_PDF: Mother DN No: 2803024442
+[2026-05-20T05:19:19.070Z] EXTRACT_PDF: Container: ECMU5463875
+[2026-05-20T05:19:19.070Z] VERIFY: Pallet breakdown by SKU+Batch:
+[2026-05-20T05:19:19.070Z] VERIFY:   194403_2028.02.08: 20 pallets, 1343 cases
+[2026-05-20T05:19:19.070Z] VERIFY:   194403_2028.02.25: 11 pallets, 770 cases
+[2026-05-20T05:19:19.070Z] VERIFY:   194403_2028.03.06: 1 pallets, 70 cases
+[2026-05-20T05:19:19.070Z] VERIFY:   194404_2028.02.10: 9 pallets, 605 cases
+[2026-05-20T05:19:19.070Z] VERIFY:   194405_2028.02.02: 3 pallets, 162 cases
+[2026-05-20T05:19:19.070Z] VERIFY: SKU 194403 total: 2183 cases (PDF A: 2183)
+[2026-05-20T05:19:19.070Z] VERIFY: SKU 194404 total: 605 cases (PDF A: 605)
+[2026-05-20T05:19:19.070Z] VERIFY: SKU 194405 total: 162 cases (PDF A: 162)
+[2026-05-20T05:19:19.070Z] VERIFY: Total pallets: 44 (PDF B page 2: 44 pallets)
+[2026-05-20T05:19:19.070Z] GOODS_SPEC: Loading goods specification
+[2026-05-20T05:19:19.070Z] LOCATION: Starting location mapping
+[2026-05-20T05:19:19.317Z] LOCATION: Master locations total: 727
+[2026-05-20T05:19:19.323Z] LOCATION: Non-use locations: 17
+[2026-05-20T05:19:19.519Z] LOCATION: Inventory locations: 499
+[2026-05-20T05:19:19.520Z] LOCATION: Reading existing ASN: ASN - Danone - ECMU5323723.xlsx
+[2026-05-20T05:19:19.571Z] LOCATION: Locations already used in other ASN files: 22 (A21-007-1, A21-007-6, A21-009-1, A21-009-5, A21-011-1, A21-013-1, A21-021-7, A21-027-1, A21-031-1, A21-033-1, A21-035-1, A21-037-1, A21-039-1, A21-041-1, A21-043-1, A21-043-2, A21-043-3, A21-043-4, A21-045-1, A21-045-2, A21-045-3, A21-045-4)
+[2026-05-20T05:19:19.572Z] LOCATION: Available locations after all filters: 202
+[2026-05-20T05:19:19.572Z] LOCATION: Assigning locations for group 194403_2028.02.08: 20 pallets
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-045-5 <- pallet 1 & 2 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-047-1 <- pallet 3 & 4 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-051-6 <- pallet 5 & 6 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-053-4 <- pallet 7 & 8 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-055-1 <- pallet 9 & 10 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-057-1 <- pallet 11 & 12 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-059-1 <- pallet 13 & 14 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-059-2 <- pallet 15 & 16 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-059-6 <- pallet 17 & 18 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-061-2 <- pallet 19 & 20 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION: Assigning locations for group 194403_2028.02.25: 11 pallets
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-061-3 <- pallet 21 & 22 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-061-5 <- pallet 23 & 24 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-061-6 <- pallet 25 & 26 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-063-5 <- pallet 27 & 28 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-063-6 <- pallet 29 & 30 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-065-1 <- pallet 31 (single pallet)
+[2026-05-20T05:19:19.572Z] LOCATION: Assigning locations for group 194403_2028.03.06: 1 pallets
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-065-5 <- pallet 32 (single pallet)
+[2026-05-20T05:19:19.572Z] LOCATION: Assigning locations for group 194404_2028.02.10: 9 pallets
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-065-6 <- pallet 33 & 34 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-067-5 <- pallet 35 & 36 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-067-6 <- pallet 37 & 38 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-067-7 <- pallet 39 & 40 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-069-1 <- pallet 41 (single pallet)
+[2026-05-20T05:19:19.572Z] LOCATION: Assigning locations for group 194405_2028.02.02: 3 pallets
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-069-4 <- pallet 42 & 43 (double-deep, same SKU+Batch)
+[2026-05-20T05:19:19.572Z] LOCATION:   A21-069-5 <- pallet 44 (single pallet)
+[2026-05-20T05:19:19.572Z] LOCATION: Total locations assigned: 24
+[2026-05-20T05:19:19.572Z] GENERATE: Creating ASN file from template
+[2026-05-20T05:19:19.619Z] GENERATE: File created: ASN - Danone - ECMU5463875.xlsx
+[2026-05-20T05:19:19.619Z] VERIFY: === FINAL VERIFICATION ===
+[2026-05-20T05:19:19.619Z] VERIFY: SKU 194403: 13098 EA = 2183 cases
+[2026-05-20T05:19:19.619Z] VERIFY: SKU 194404: 3630 EA = 605 cases
+[2026-05-20T05:19:19.619Z] VERIFY: SKU 194405: 972 EA = 162 cases
+[2026-05-20T05:19:19.619Z] VERIFY: Locations in previous ASN: 22
+[2026-05-20T05:19:19.619Z] VERIFY: Locations in this ASN: 24
+[2026-05-20T05:19:19.619Z] VERIFY: ✅ No duplicate locations with other ASN files
+[2026-05-20T05:19:19.619Z] VERIFY: ✅ Double-deep logic correct (all locations have ≤2 pallets with same SKU+Batch)
+[2026-05-20T05:19:19.619Z] VERIFY: ✅ Total rows: 44
+[2026-05-20T05:19:19.619Z] VERIFY: ✅ File: ASN - Danone - ECMU5463875.xlsx

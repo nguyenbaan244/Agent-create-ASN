@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASN Agent Hub</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i class="fa-solid fa-boxes-packing"></i>
+          <span>Agent Hub</span>
+        </div>
+      </div>
+      
+      <ul class="nav-menu">
+        <li class="nav-item active" data-tab="asn-generator">
+          <i class="fa-solid fa-file-excel"></i> ASN Generator
+        </li>
+        <li class="nav-item" data-tab="logs">
+          <i class="fa-solid fa-clipboard-list"></i> Activity Logs
+        </li>
+        <li class="nav-item" data-tab="inventory-analytics">
+          <i class="fa-solid fa-chart-pie"></i> Inventory Analytics
+        </li>
+        <li class="nav-item" data-tab="empty-locations">
+          <i class="fa-solid fa-map-location-dot"></i> Empty Locations
+        </li>
+        <li class="nav-item" data-tab="master-data">
+          <i class="fa-solid fa-database"></i> Master Data Mgmt
+        </li>
+      </ul>
+      
+      <div class="sidebar-footer">
+        <div class="status-indicator" style="margin-bottom: 16px;">
+          <div class="status-dot green"></div> System Online
+        </div>
+        <button id="btn-shutdown" class="btn-sm btn-delete" style="width: 100%; display: flex; justify-content: center; gap: 8px;">
+          <i class="fa-solid fa-power-off"></i> Stop Server
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <h1 id="page-title">ASN Generator Workflow</h1>
+        <div class="user-profile">
+          <span>Hello, Operations</span>
+          <div class="avatar"><i class="fa-solid fa-user"></i></div>
+        </div>
+      </header>
+
+      <div class="content-wrapper">
+        
+        <!-- Tab 1: ASN Generator -->
+        <div id="asn-generator" class="tab-content active">
+          
+          <!-- Top Row: Stats -->
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-icon blue"><i class="fa-regular fa-file-pdf"></i></div>
+              <div class="stat-info">
+                <span class="stat-label">Pending PDFs</span>
+                <h3 class="stat-value" id="pdf-count">0</h3>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon green"><i class="fa-regular fa-file-excel"></i></div>
+              <div class="stat-info">
+                <span class="stat-label">Generated ASNs</span>
+                <h3 class="stat-value" id="asn-count">0</h3>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon orange"><i class="fa-solid fa-location-dot"></i></div>
+              <div class="stat-info">
+                <span class="stat-label">Available Locations</span>
+                <h3 class="stat-value" id="loc-available">0</h3>
+                <span class="stat-subtext" id="loc-blocked">0 blocked by active ASNs</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Middle Row: Actions & Input -->
+          <div class="action-panel">
+            <div class="panel-header">
+              <h2><i class="fa-solid fa-gears"></i> Workflow Execution</h2>
+              <button id="btn-refresh-inputs" class="btn-icon" title="Refresh Input Files"><i class="fa-solid fa-rotate-right"></i></button>
+            </div>
+            <div class="panel-body">
+              <p>The ASN Agent will parse all PDFs in the input folder, cross-reference Goods Specification, assign double-deep rack locations, and generate formatted Excel outputs.</p>
+              
+              <div class="input-lists-container" style="display: flex; gap: 24px; margin-bottom: 20px;">
+                <div class="input-files-list" style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4 style="margin-bottom: 0;">Inventory File:</h4>
+                    <div style="display: flex; gap: 8px;">
+                      <button class="btn-sm btn-primary btn-upload" data-folder="inventory" title="Import Inventory File"><i class="fa-solid fa-upload"></i> Import</button>
+                      <button class="btn-sm btn-download btn-open-folder" data-folder="inventory" title="Open Inventory Folder"><i class="fa-solid fa-folder-open"></i></button>
+                    </div>
+                  </div>
+                  <input type="file" id="file-upload-inventory" style="display: none;" accept=".xlsx,.xls">
+                  <ul id="inventory-list" class="file-list">
+                    <!-- JS will populate this -->
+                  </ul>
+                </div>
+
+                <div class="input-files-list" style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4 style="margin-bottom: 0;">Found PDF Files:</h4>
+                    <div style="display: flex; gap: 8px;">
+                      <button class="btn-sm btn-primary btn-upload" data-folder="pdf" title="Import PDF Files"><i class="fa-solid fa-upload"></i> Import</button>
+                      <button class="btn-sm btn-download btn-open-folder" data-folder="pdf" title="Open PDF Folder"><i class="fa-solid fa-folder-open"></i></button>
+                    </div>
+                  </div>
+                  <input type="file" id="file-upload-pdf" style="display: none;" accept=".pdf" multiple>
+                  <ul id="pdf-list" class="file-list">
+                    <!-- JS will populate this -->
+                  </ul>
+                </div>
+              </div>
+              
+              <button id="btn-generate" class="btn-primary">
+                <i class="fa-solid fa-play"></i> Run ASN Agent
+              </button>
+            </div>
+          </div>
+
+          <!-- Output Panel -->
+          <div class="output-panel">
+            <div class="panel-header">
+              <h2><i class="fa-solid fa-folder-open"></i> ASN Outputs</h2>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-sm btn-download btn-open-folder" data-folder="asn" title="Open ASN Folder"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
+                <button id="btn-refresh" class="btn-icon" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table id="asn-table">
+                <thead>
+                  <tr>
+                    <th>File Name</th>
+                    <th>Size</th>
+                    <th>Last Modified</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="asn-table-body">
+                  <!-- JS will populate this -->
+                </tbody>
+              </table>
+              <div id="no-asn-msg" class="empty-state hidden">
+                <i class="fa-regular fa-folder-open"></i>
+                <p>No ASN files found in output directory.</p>
+              </div>
+            </div>
+          </div>
+          
+        </div> <!-- End Tab 1 -->
+
+        <!-- Tab 2: Logs -->
+        <div id="logs" class="tab-content">
+          <div class="log-panel">
+            <div class="panel-header">
+              <h2>System Logs</h2>
+              <button id="btn-refresh-logs" class="btn-icon"><i class="fa-solid fa-rotate-right"></i></button>
+            </div>
+            <div class="log-container" id="log-list">
+              <!-- JS will populate this -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Inventory Analytics -->
+        <div id="inventory-analytics" class="tab-content">
+          <div class="action-panel">
+            <div class="panel-header">
+              <h2><i class="fa-solid fa-microscope"></i> Inventory Location Analysis</h2>
+            </div>
+            <div class="panel-body">
+              <p>Analyze the current inventory to find pallets placed incorrectly. The system checks if any location contains multiple SKUs or mixed Batches.</p>
+              
+              <button id="btn-analyze-inventory" class="btn-primary" style="margin-top: 16px;">
+                <i class="fa-solid fa-magnifying-glass"></i> Run Analysis
+              </button>
+
+              <div id="inventory-analyze-result" class="hidden" style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <h3 style="margin-bottom: 8px;">Analysis Results</h3>
+                <p id="inventory-analyze-msg"></p>
+                
+                <div class="stats-row" style="margin-top: 16px; margin-bottom: 16px;">
+                  <div class="stat-card">
+                    <div class="stat-icon orange"><i class="fa-solid fa-location-xmark"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Wrong Locations</span>
+                      <h3 class="stat-value" id="wrong-loc-count">0</h3>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-icon orange"><i class="fa-solid fa-boxes-stacked"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Affected Pallets</span>
+                      <h3 class="stat-value" id="wrong-pallet-count">0</h3>
+                    </div>
+                  </div>
+                </div>
+
+                <a id="btn-download-wrong-loc" href="/api/inventory/download-wrong-location" class="btn-primary hidden" download style="display: inline-flex; text-decoration: none;">
+                  <i class="fa-solid fa-download"></i> Download Report (Excel)
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Empty Locations -->
+        <div id="empty-locations" class="tab-content">
+          <div class="action-panel">
+            <div class="panel-header">
+              <h2><i class="fa-solid fa-map-location-dot"></i> Empty Locations Extractor</h2>
+            </div>
+            <div class="panel-body">
+              <p>Find all available empty locations that are ready to receive new pallets. This filters out non-use locations, current inventory, and locations blocked by generated ASNs.</p>
+              
+              <button id="btn-extract-empty-loc" class="btn-primary" style="margin-top: 16px;">
+                <i class="fa-solid fa-magnifying-glass"></i> Find Empty Locations
+              </button>
+
+              <div id="empty-loc-result" class="hidden" style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <h3 style="margin-bottom: 8px;">Extraction Results</h3>
+                <p id="empty-loc-msg"></p>
+                
+                <div class="stats-row" style="margin-top: 16px; margin-bottom: 16px;">
+                  <div class="stat-card">
+                    <div class="stat-icon green"><i class="fa-solid fa-check"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Empty Locations</span>
+                      <h3 class="stat-value" id="empty-loc-count-val">0</h3>
+                    </div>
+                  </div>
+                </div>
+
+                <a id="btn-download-empty-loc" href="/api/empty-locations/download" class="btn-primary hidden" download style="display: inline-flex; text-decoration: none;">
+                  <i class="fa-solid fa-download"></i> Download Excel
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 5: Master Data Mgmt -->
+        <div id="master-data" class="tab-content">
+          <div class="action-panel">
+            <div class="panel-header">
+              <h2><i class="fa-solid fa-database"></i> Master Data Management</h2>
+            </div>
+            <div class="panel-body">
+              <p>Quickly access the master data folders to update rules and configurations for the ASN Agent.</p>
+              
+              <div class="stats-row">
+                <div class="stat-card" style="justify-content: space-between; cursor: pointer;">
+                  <div style="display: flex; gap: 16px; align-items: center;">
+                    <div class="stat-icon blue"><i class="fa-solid fa-clipboard-list"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Goods Specification</span>
+                      <h3 class="stat-value" style="font-size: 16px;">Goods specification.xlsx</h3>
+                    </div>
+                  </div>
+                  <button class="btn-sm btn-download btn-open-folder" data-folder="md-goods-spec" title="Open Goods Specification Folder">
+                    <i class="fa-solid fa-folder-open"></i> Open Folder
+                  </button>
+                </div>
+                
+                <div class="stat-card" style="justify-content: space-between; cursor: pointer;">
+                  <div style="display: flex; gap: 16px; align-items: center;">
+                    <div class="stat-icon green"><i class="fa-solid fa-map"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Master Location</span>
+                      <h3 class="stat-value" style="font-size: 16px;">Master Location.xlsx</h3>
+                    </div>
+                  </div>
+                  <button class="btn-sm btn-download btn-open-folder" data-folder="md-master-loc" title="Open Master Location Folder">
+                    <i class="fa-solid fa-folder-open"></i> Open Folder
+                  </button>
+                </div>
+
+                <div class="stat-card" style="justify-content: space-between; cursor: pointer;">
+                  <div style="display: flex; gap: 16px; align-items: center;">
+                    <div class="stat-icon orange"><i class="fa-solid fa-ban"></i></div>
+                    <div class="stat-info">
+                      <span class="stat-label">Location - Non use</span>
+                      <h3 class="stat-value" style="font-size: 16px;">Location Non use.xlsx</h3>
+                    </div>
+                  </div>
+                  <button class="btn-sm btn-download btn-open-folder" data-folder="md-non-use-loc" title="Open Non Use Location Folder">
+                    <i class="fa-solid fa-folder-open"></i> Open Folder
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- End Content Wrapper -->
+    </main>
+  </div>
+
+  <!-- Modal for Action Feedback -->
+  <div id="loading-modal" class="modal">
+    <div class="modal-content">
+      <div class="spinner"></div>
+      <h2>Agent is working...</h2>
+      <p id="loading-text">Extracting data from PDFs and mapping locations.</p>
+    </div>
+  </div>
+
+  <div id="result-modal" class="modal">
+    <div class="modal-content result-modal">
+      <div class="result-icon success" id="result-icon"><i class="fa-solid fa-check-circle"></i></div>
+      <h2 id="result-title">Success</h2>
+      <div id="result-body" class="result-details">
+        <!-- Result details injected here -->
+      </div>
+      <button class="btn-primary" id="btn-close-modal">Close</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
