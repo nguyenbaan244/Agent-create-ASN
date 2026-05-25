@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(targetId).classList.add('active');
       
       if (targetId === 'asn-generator') pageTitle.innerText = 'ASN Generator Workflow';
-      if (targetId === 'inventory-analytics') pageTitle.innerText = 'Inventory Analytics';
+      if (targetId === 'inventory-analytics') pageTitle.innerText = 'Wrong Location';
       if (targetId === 'empty-locations') pageTitle.innerText = 'Empty Locations';
       if (targetId === 'master-data') {
         pageTitle.innerText = 'Master Data Management';
