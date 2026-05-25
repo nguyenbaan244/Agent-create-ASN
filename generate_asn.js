@@ -68,10 +68,10 @@ function loadMappingRules() {
 }
 
 // ============================================================
-// EXTRACT PDF DATA (from buffers)
+// EXTRACT PDF DATA (from buffers) - uses pdf-parse (Node.js compatible)
 // ============================================================
 async function extractPDFData(pdfBuffers, logger) {
-  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const pdfParse = require('pdf-parse');
   
   if (pdfBuffers.length === 0) {
     throw new Error('No PDF files provided');
@@ -96,22 +96,15 @@ async function extractPDFData(pdfBuffers, logger) {
     let pdfBText = '';
     
     for (const { filename, buffer } of files.sort((a, b) => a.filename.localeCompare(b.filename))) {
-      const data = new Uint8Array(buffer);
-      const doc = await getDocument({ data }).promise;
-      
-      let fullText = '';
-      for (let p = 1; p <= doc.numPages; p++) {
-        const page = await doc.getPage(p);
-        const tc = await page.getTextContent();
-        fullText += tc.items.map(item => item.str).join(' ') + '\n';
-      }
+      const pdfData = await pdfParse(Buffer.from(buffer));
+      const fullText = pdfData.text;
       
       if (filename.includes('A.pdf') || filename.endsWith('A.pdf')) {
         pdfAText = fullText;
-        logger.log('EXTRACT_PDF', `Read PDF A: ${filename}`);
+        logger.log('EXTRACT_PDF', `Read PDF A: ${filename} (${pdfData.numpages} pages)`);
       } else if (filename.includes('B.pdf') || filename.endsWith('B.pdf')) {
         pdfBText = fullText;
-        logger.log('EXTRACT_PDF', `Read PDF B: ${filename}`);
+        logger.log('EXTRACT_PDF', `Read PDF B: ${filename} (${pdfData.numpages} pages)`);
       }
     }
 
