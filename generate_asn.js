@@ -71,7 +71,12 @@ function loadMappingRules() {
 // EXTRACT PDF DATA (from buffers) - uses pdfjs-dist with polyfill from server.js
 // ============================================================
 async function extractPDFData(pdfBuffers, logger) {
-  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const { pathToFileURL } = require('url');
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  // Set worker source path correctly for Node.js / Vercel serverless
+  const workerPath = path.join(path.dirname(require.resolve('pdfjs-dist/legacy/build/pdf.mjs')), 'pdf.worker.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+  const { getDocument } = pdfjsLib;
   
   if (pdfBuffers.length === 0) {
     throw new Error('No PDF files provided');
