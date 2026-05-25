@@ -1,33 +1,18 @@
 const XLSX = require('xlsx');
-const fs = require('fs');
-const path = require('path');
 
-const BASE_DIR = __dirname;
-const PATHS = {
-  inventory: path.join(BASE_DIR, 'Input', 'Inventory'),
-  output: path.join(BASE_DIR, 'Output', 'Inventory Analyze'),
-};
-
-function analyzeInventory() {
+/**
+ * Analyze inventory for wrong locations.
+ * @param {Buffer} inventoryBuffer - The inventory Excel file as a buffer
+ * @returns {Object} - Analysis results with optional output buffer
+ */
+function analyzeInventory(inventoryBuffer) {
   try {
-    // 1. Find the latest inventory file
-    const invFiles = fs.readdirSync(PATHS.inventory).filter(f => f.endsWith('.xlsx') && !f.startsWith('~$'));
-    if (invFiles.length === 0) {
-      return { success: false, error: 'No inventory file found in Input/Inventory' };
+    if (!inventoryBuffer) {
+      return { success: false, error: 'No inventory file provided. Please upload an inventory file first.' };
     }
-    
-    // Sort by modified time descending to get the latest
-    invFiles.sort((a, b) => {
-      const statA = fs.statSync(path.join(PATHS.inventory, a));
-      const statB = fs.statSync(path.join(PATHS.inventory, b));
-      return statB.mtime - statA.mtime;
-    });
 
-    const inventoryFile = invFiles[0];
-    const inventoryPath = path.join(PATHS.inventory, inventoryFile);
-    
-    // 2. Read the file
-    const wb = XLSX.readFile(inventoryPath, { cellStyles: true });
+    // Read the buffer
+    const wb = XLSX.read(inventoryBuffer, { type: 'buffer', cellStyles: true });
     const sheetName = wb.SheetNames[0];
     const ws = wb.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -38,34 +23,34 @@ function analyzeInventory() {
 
     const headers = data[0];
     
-    // 3. Find necessary columns
+    // Find necessary columns
     const locIdx = headers.findIndex(h => String(h).trim().toLowerCase() === 'loc');
     const skuIdx = headers.findIndex(h => String(h).trim().toLowerCase() === 'sku');
     const batchIdx = headers.findIndex(h => String(h).trim().toLowerCase() === 'lottable01');
+    const idIdx = headers.findIndex(h => String(h).trim().toLowerCase() === 'id');
 
-    if (locIdx === -1 || skuIdx === -1 || batchIdx === -1) {
-      return { success: false, error: 'Missing required columns in inventory file: Loc, SKU, or Lottable01' };
+    if (locIdx === -1 || skuIdx === -1 || batchIdx === -1 || idIdx === -1) {
+      return { success: false, error: 'Missing required columns in inventory file: Loc, SKU, Lottable01, or ID' };
     }
 
-    // 4. Group rows by Loc
+    // Group rows by Loc
     const locGroups = {};
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      // Skip empty trailing rows
       if (row.every(cell => cell === '')) continue;
       
       const loc = String(row[locIdx] || '').trim();
       const sku = String(row[skuIdx] || '').trim();
       const batch = String(row[batchIdx] || '').trim();
+      const id = String(row[idIdx] || '').trim();
 
-      if (!loc) continue; // Skip empty locations
+      if (!loc) continue;
+      
+      // Rule: Exclude if ID starts with MIXD or POSM
+      if (id.startsWith('MIXD') || id.startsWith('POSM')) continue;
       
       if (!locGroups[loc]) {
-        locGroups[loc] = {
-          skus: new Set(),
-          batches: new Set(),
-          rows: []
-        };
+        locGroups[loc] = { skus: new Set(), batches: new Set(), rows: [] };
       }
       
       if (sku) locGroups[loc].skus.add(sku);
@@ -73,11 +58,13 @@ function analyzeInventory() {
       locGroups[loc].rows.push(row);
     }
 
-    // 5. Find wrong locations
-    const wrongRows = [];
+    // Find wrong locations
+    let wrongRows = [];
     let wrongLocCount = 0;
+    const sortedLocs = Object.keys(locGroups).sort();
 
-    for (const [loc, group] of Object.entries(locGroups)) {
+    for (const loc of sortedLocs) {
+      const group = locGroups[loc];
       if (group.skus.size > 1 || group.batches.size > 1) {
         wrongLocCount++;
         wrongRows.push(...group.rows);
@@ -93,22 +80,22 @@ function analyzeInventory() {
       };
     }
 
-    // 6. Create output Excel
-    if (!fs.existsSync(PATHS.output)) {
-      fs.mkdirSync(PATHS.output, { recursive: true });
-    }
+    // Prepare preview data for UI
+    const preview = wrongRows.slice(0, 5).map(r => ({
+      loc: String(r[locIdx] || '').trim(),
+      id: String(r[idIdx] || '').trim(),
+      sku: String(r[skuIdx] || '').trim(),
+      batch: String(r[batchIdx] || '').trim()
+    }));
 
-    const outputPath = path.join(PATHS.output, 'Wrong Location.xlsx');
+    // Create output Excel as buffer (not file)
     const outputData = [headers, ...wrongRows];
-    
     const outputWs = XLSX.utils.aoa_to_sheet(outputData);
     
-    // Copy column widths if available
     if (ws['!cols']) {
       outputWs['!cols'] = ws['!cols'];
     }
 
-    // Copy header styles
     for (let c = 0; c < headers.length; c++) {
       const srcRef = XLSX.utils.encode_cell({ r: 0, c });
       if (ws[srcRef] && ws[srcRef].s) {
@@ -119,14 +106,15 @@ function analyzeInventory() {
 
     const outputWb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(outputWb, outputWs, 'Wrong Locations');
-    XLSX.writeFile(outputWb, outputPath);
+    const outputBuffer = XLSX.write(outputWb, { type: 'buffer', bookType: 'xlsx' });
 
     return {
       success: true,
       message: `Analysis complete. Found ${wrongLocCount} wrong locations affecting ${wrongRows.length} pallets.`,
       wrongLocCount: wrongLocCount,
       wrongPalletCount: wrongRows.length,
-      outputFile: 'Wrong Location.xlsx'
+      outputBuffer: outputBuffer,
+      preview: preview
     };
 
   } catch (error) {
@@ -134,7 +122,4 @@ function analyzeInventory() {
   }
 }
 
-module.exports = {
-  analyzeInventory,
-  PATHS
-};
+module.exports = { analyzeInventory };

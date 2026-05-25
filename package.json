@@ -1,17 +1,21 @@
 {
   "name": "generate-asn",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "ASN Agent Hub - Cloud Ready",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "dotenv": "^16.5.0",
     "express": "^5.2.1",
+    "multer": "^1.4.5-lts.2",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.7.284",
     "xlsx": "^0.18.5"

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ASN Agent Hub</title>
+  <meta name="description" content="ASN Agent Hub - Automated ASN Generation, Inventory Analytics, and Location Management">
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -24,9 +25,6 @@
         <li class="nav-item active" data-tab="asn-generator">
           <i class="fa-solid fa-file-excel"></i> ASN Generator
         </li>
-        <li class="nav-item" data-tab="logs">
-          <i class="fa-solid fa-clipboard-list"></i> Activity Logs
-        </li>
         <li class="nav-item" data-tab="inventory-analytics">
           <i class="fa-solid fa-chart-pie"></i> Inventory Analytics
         </li>
@@ -36,15 +34,15 @@
         <li class="nav-item" data-tab="master-data">
           <i class="fa-solid fa-database"></i> Master Data Mgmt
         </li>
+        <li class="nav-item" data-tab="logs">
+          <i class="fa-solid fa-clipboard-list"></i> Activity Logs
+        </li>
       </ul>
       
       <div class="sidebar-footer">
-        <div class="status-indicator" style="margin-bottom: 16px;">
-          <div class="status-dot green"></div> System Online
+        <div class="status-indicator">
+          <div class="status-dot green"></div> Cloud Connected
         </div>
-        <button id="btn-shutdown" class="btn-sm btn-delete" style="width: 100%; display: flex; justify-content: center; gap: 8px;">
-          <i class="fa-solid fa-power-off"></i> Stop Server
-        </button>
       </div>
     </aside>
 
@@ -87,6 +85,7 @@
                 <span class="stat-label">Available Locations</span>
                 <h3 class="stat-value" id="loc-available">0</h3>
                 <span class="stat-subtext" id="loc-blocked">0 blocked by active ASNs</span>
+                <span class="stat-subtext" id="loc-blocked-nonuse" style="color: #f59e0b; margin-top: 2px;">0 blocked by non use</span>
               </div>
             </div>
           </div>
@@ -98,7 +97,7 @@
               <button id="btn-refresh-inputs" class="btn-icon" title="Refresh Input Files"><i class="fa-solid fa-rotate-right"></i></button>
             </div>
             <div class="panel-body">
-              <p>The ASN Agent will parse all PDFs in the input folder, cross-reference Goods Specification, assign double-deep rack locations, and generate formatted Excel outputs.</p>
+              <p>The ASN Agent will parse all PDFs in the input, cross-reference Goods Specification, assign double-deep rack locations, and generate formatted Excel outputs.</p>
               
               <div class="input-lists-container" style="display: flex; gap: 24px; margin-bottom: 20px;">
                 <div class="input-files-list" style="flex: 1;">
@@ -106,7 +105,6 @@
                     <h4 style="margin-bottom: 0;">Inventory File:</h4>
                     <div style="display: flex; gap: 8px;">
                       <button class="btn-sm btn-primary btn-upload" data-folder="inventory" title="Import Inventory File"><i class="fa-solid fa-upload"></i> Import</button>
-                      <button class="btn-sm btn-download btn-open-folder" data-folder="inventory" title="Open Inventory Folder"><i class="fa-solid fa-folder-open"></i></button>
                     </div>
                   </div>
                   <input type="file" id="file-upload-inventory" style="display: none;" accept=".xlsx,.xls">
@@ -120,7 +118,6 @@
                     <h4 style="margin-bottom: 0;">Found PDF Files:</h4>
                     <div style="display: flex; gap: 8px;">
                       <button class="btn-sm btn-primary btn-upload" data-folder="pdf" title="Import PDF Files"><i class="fa-solid fa-upload"></i> Import</button>
-                      <button class="btn-sm btn-download btn-open-folder" data-folder="pdf" title="Open PDF Folder"><i class="fa-solid fa-folder-open"></i></button>
                     </div>
                   </div>
                   <input type="file" id="file-upload-pdf" style="display: none;" accept=".pdf" multiple>
@@ -140,10 +137,7 @@
           <div class="output-panel">
             <div class="panel-header">
               <h2><i class="fa-solid fa-folder-open"></i> ASN Outputs</h2>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <button class="btn-sm btn-download btn-open-folder" data-folder="asn" title="Open ASN Folder"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
-                <button id="btn-refresh" class="btn-icon" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
-              </div>
+              <button id="btn-refresh" class="btn-icon" title="Refresh"><i class="fa-solid fa-rotate-right"></i></button>
             </div>
             <div class="table-container">
               <table id="asn-table">
@@ -161,7 +155,7 @@
               </table>
               <div id="no-asn-msg" class="empty-state hidden">
                 <i class="fa-regular fa-folder-open"></i>
-                <p>No ASN files found in output directory.</p>
+                <p>No ASN files generated yet.</p>
               </div>
             </div>
           </div>
@@ -183,41 +177,65 @@
 
         <!-- Tab 3: Inventory Analytics -->
         <div id="inventory-analytics" class="tab-content">
-          <div class="action-panel">
-            <div class="panel-header">
-              <h2><i class="fa-solid fa-microscope"></i> Inventory Location Analysis</h2>
-            </div>
-            <div class="panel-body">
-              <p>Analyze the current inventory to find pallets placed incorrectly. The system checks if any location contains multiple SKUs or mixed Batches.</p>
-              
-              <button id="btn-analyze-inventory" class="btn-primary" style="margin-top: 16px;">
-                <i class="fa-solid fa-magnifying-glass"></i> Run Analysis
+          <!-- Premium Hero Section -->
+          <div class="analytics-hero">
+            <div class="analytics-hero-content">
+              <h2><i class="fa-solid fa-satellite-dish"></i> Warehouse Integrity Scanner</h2>
+              <p>Detect incorrectly placed pallets automatically. The system scans for mixed SKUs or mixed Batches in the same location while bypassing MIXD/POSM pallets.</p>
+              <button id="btn-analyze-inventory" class="btn-primary btn-large btn-scan">
+                <i class="fa-solid fa-magnifying-glass"></i> Start Deep Scan
               </button>
+            </div>
+            <div class="scanner-visual">
+              <div class="radar" id="radar-anim"></div>
+            </div>
+          </div>
 
-              <div id="inventory-analyze-result" class="hidden" style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                <h3 style="margin-bottom: 8px;">Analysis Results</h3>
-                <p id="inventory-analyze-msg"></p>
-                
-                <div class="stats-row" style="margin-top: 16px; margin-bottom: 16px;">
-                  <div class="stat-card">
-                    <div class="stat-icon orange"><i class="fa-solid fa-location-xmark"></i></div>
-                    <div class="stat-info">
-                      <span class="stat-label">Wrong Locations</span>
-                      <h3 class="stat-value" id="wrong-loc-count">0</h3>
-                    </div>
-                  </div>
-                  <div class="stat-card">
-                    <div class="stat-icon orange"><i class="fa-solid fa-boxes-stacked"></i></div>
-                    <div class="stat-info">
-                      <span class="stat-label">Affected Pallets</span>
-                      <h3 class="stat-value" id="wrong-pallet-count">0</h3>
-                    </div>
-                  </div>
+          <div id="inventory-analyze-result" class="analytics-results hidden">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+              <div>
+                <h3 class="results-title" style="margin-bottom: 8px;"><i class="fa-solid fa-chart-line"></i> Scan Report</h3>
+                <p id="inventory-analyze-msg" class="results-msg" style="margin-bottom: 0;"></p>
+              </div>
+              <a id="btn-download-wrong-loc" href="/api/inventory/download-wrong-location" class="btn-primary btn-download-report hidden" download>
+                <i class="fa-solid fa-file-excel"></i> Export Full Report
+              </a>
+            </div>
+            
+            <div class="stats-row premium-stats">
+              <div class="stat-card glass-card">
+                <div class="stat-icon warning-glow"><i class="fa-solid fa-location-xmark"></i></div>
+                <div class="stat-info">
+                  <span class="stat-label">Wrong Locations</span>
+                  <h3 class="stat-value counter" id="wrong-loc-count">0</h3>
                 </div>
+              </div>
+              <div class="stat-card glass-card">
+                <div class="stat-icon error-glow"><i class="fa-solid fa-boxes-stacked"></i></div>
+                <div class="stat-info">
+                  <span class="stat-label">Affected Pallets</span>
+                  <h3 class="stat-value counter" id="wrong-pallet-count">0</h3>
+                </div>
+              </div>
+            </div>
 
-                <a id="btn-download-wrong-loc" href="/api/inventory/download-wrong-location" class="btn-primary hidden" download style="display: inline-flex; text-decoration: none;">
-                  <i class="fa-solid fa-download"></i> Download Report (Excel)
-                </a>
+            <!-- Preview Table -->
+            <div id="wrong-loc-preview-container" class="preview-container hidden">
+              <h4 class="preview-title"><i class="fa-solid fa-eye"></i> Detection Preview (Top 5)</h4>
+              <div class="table-container glass-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Location</th>
+                      <th>Pallet ID (SSCC)</th>
+                      <th>SKU</th>
+                      <th>Batch</th>
+                    </tr>
+                  </thead>
+                  <tbody id="wrong-loc-preview-body">
+                    <!-- JS populated -->
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -263,48 +281,73 @@
           <div class="action-panel">
             <div class="panel-header">
               <h2><i class="fa-solid fa-database"></i> Master Data Management</h2>
+              <button id="btn-refresh-master" class="btn-icon" title="Refresh Status"><i class="fa-solid fa-rotate-right"></i></button>
             </div>
             <div class="panel-body">
-              <p>Quickly access the master data folders to update rules and configurations for the ASN Agent.</p>
+              <p>Upload and manage master data files stored in the cloud. These files are used by all Agent features.</p>
               
-              <div class="stats-row">
-                <div class="stat-card" style="justify-content: space-between; cursor: pointer;">
+              <div class="stats-row" id="master-data-cards">
+                <!-- Goods Specification -->
+                <div class="stat-card md-card" style="justify-content: space-between; flex-wrap: wrap;">
                   <div style="display: flex; gap: 16px; align-items: center;">
                     <div class="stat-icon blue"><i class="fa-solid fa-clipboard-list"></i></div>
                     <div class="stat-info">
                       <span class="stat-label">Goods Specification</span>
                       <h3 class="stat-value" style="font-size: 16px;">Goods specification.xlsx</h3>
+                      <span class="md-status" id="md-status-goods-spec" style="font-size: 12px; color: var(--text-muted);">Checking...</span>
                     </div>
                   </div>
-                  <button class="btn-sm btn-download btn-open-folder" data-folder="md-goods-spec" title="Open Goods Specification Folder">
-                    <i class="fa-solid fa-folder-open"></i> Open Folder
-                  </button>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-sm btn-primary btn-upload-md" data-md-type="goods-spec" title="Upload new file">
+                      <i class="fa-solid fa-upload"></i> Upload
+                    </button>
+                    <a class="btn-sm btn-download btn-download-md" href="/api/master-data/goods-spec" download title="Download current file">
+                      <i class="fa-solid fa-download"></i>
+                    </a>
+                  </div>
+                  <input type="file" class="md-file-input" data-md-type="goods-spec" style="display: none;" accept=".xlsx,.xls">
                 </div>
                 
-                <div class="stat-card" style="justify-content: space-between; cursor: pointer;">
+                <!-- Master Location -->
+                <div class="stat-card md-card" style="justify-content: space-between; flex-wrap: wrap;">
                   <div style="display: flex; gap: 16px; align-items: center;">
                     <div class="stat-icon green"><i class="fa-solid fa-map"></i></div>
                     <div class="stat-info">
                       <span class="stat-label">Master Location</span>
                       <h3 class="stat-value" style="font-size: 16px;">Master Location.xlsx</h3>
+                      <span class="md-status" id="md-status-master-loc" style="font-size: 12px; color: var(--text-muted);">Checking...</span>
                     </div>
                   </div>
-                  <button class="btn-sm btn-download btn-open-folder" data-folder="md-master-loc" title="Open Master Location Folder">
-                    <i class="fa-solid fa-folder-open"></i> Open Folder
-                  </button>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-sm btn-primary btn-upload-md" data-md-type="master-loc" title="Upload new file">
+                      <i class="fa-solid fa-upload"></i> Upload
+                    </button>
+                    <a class="btn-sm btn-download btn-download-md" href="/api/master-data/master-loc" download title="Download current file">
+                      <i class="fa-solid fa-download"></i>
+                    </a>
+                  </div>
+                  <input type="file" class="md-file-input" data-md-type="master-loc" style="display: none;" accept=".xlsx,.xls">
                 </div>
 
-                <div class="stat-card" style="justify-content: space-between; cursor: pointer;">
+                <!-- Location Non use -->
+                <div class="stat-card md-card" style="justify-content: space-between; flex-wrap: wrap;">
                   <div style="display: flex; gap: 16px; align-items: center;">
                     <div class="stat-icon orange"><i class="fa-solid fa-ban"></i></div>
                     <div class="stat-info">
                       <span class="stat-label">Location - Non use</span>
                       <h3 class="stat-value" style="font-size: 16px;">Location Non use.xlsx</h3>
+                      <span class="md-status" id="md-status-non-use-loc" style="font-size: 12px; color: var(--text-muted);">Checking...</span>
                     </div>
                   </div>
-                  <button class="btn-sm btn-download btn-open-folder" data-folder="md-non-use-loc" title="Open Non Use Location Folder">
-                    <i class="fa-solid fa-folder-open"></i> Open Folder
-                  </button>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn-sm btn-primary btn-upload-md" data-md-type="non-use-loc" title="Upload new file">
+                      <i class="fa-solid fa-upload"></i> Upload
+                    </button>
+                    <a class="btn-sm btn-download btn-download-md" href="/api/master-data/non-use-loc" download title="Download current file">
+                      <i class="fa-solid fa-download"></i>
+                    </a>
+                  </div>
+                  <input type="file" class="md-file-input" data-md-type="non-use-loc" style="display: none;" accept=".xlsx,.xls">
                 </div>
               </div>
             </div>
@@ -332,6 +375,19 @@
         <!-- Result details injected here -->
       </div>
       <button class="btn-primary" id="btn-close-modal">Close</button>
+    </div>
+  </div>
+
+  <!-- Modal for Custom Confirm -->
+  <div id="confirm-modal" class="modal">
+    <div class="modal-content confirm-modal-content">
+      <div class="result-icon warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <h2 id="confirm-title" style="margin-bottom: 12px;">Confirm Action</h2>
+      <p id="confirm-message" style="color: var(--text-muted);">Are you sure?</p>
+      <div class="confirm-actions">
+        <button class="btn-primary btn-delete" id="btn-confirm-yes" style="font-size: 15px; padding: 10px 24px;">Confirm</button>
+        <button class="btn-primary" id="btn-confirm-no" style="font-size: 15px; padding: 10px 24px; background: #e2e8f0; color: #475569;">Cancel</button>
+      </div>
     </div>
   </div>
 

@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const asnCountEl = document.getElementById('asn-count');
   const locAvailableEl = document.getElementById('loc-available');
   const locBlockedEl = document.getElementById('loc-blocked');
+  const locBlockedNonUseEl = document.getElementById('loc-blocked-nonuse');
   
   const pdfListEl = document.getElementById('pdf-list');
   const inventoryListEl = document.getElementById('inventory-list');
@@ -22,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnRefreshInputs = document.getElementById('btn-refresh-inputs');
   const btnRefreshLogs = document.getElementById('btn-refresh-logs');
   const btnCloseModal = document.getElementById('btn-close-modal');
-  const btnShutdown = document.getElementById('btn-shutdown');
   
   const loadingModal = document.getElementById('loading-modal');
   const resultModal = document.getElementById('result-modal');
@@ -32,6 +32,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialization
   refreshData();
+  fetchMasterDataStatus();
+
+  // Custom Confirm Modal Logic
+  const confirmModal = document.getElementById('confirm-modal');
+  const confirmTitle = document.getElementById('confirm-title');
+  const confirmMessage = document.getElementById('confirm-message');
+  const btnConfirmYes = document.getElementById('btn-confirm-yes');
+  const btnConfirmNo = document.getElementById('btn-confirm-no');
+  let confirmCallback = null;
+
+  function showConfirmModal(title, message, callback) {
+    if (!confirmModal) return;
+    confirmTitle.innerText = title;
+    confirmMessage.innerText = message;
+    confirmCallback = callback;
+    confirmModal.classList.add('active');
+  }
+
+  if (btnConfirmYes) {
+    btnConfirmYes.addEventListener('click', () => {
+      confirmModal.classList.remove('active');
+      if (confirmCallback) confirmCallback();
+    });
+  }
+  
+  if (btnConfirmNo) {
+    btnConfirmNo.addEventListener('click', () => {
+      confirmModal.classList.remove('active');
+      confirmCallback = null;
+    });
+  }
 
   // Navigation logic
   tabItems.forEach(item => {
@@ -46,6 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(targetId).classList.add('active');
       
       if (targetId === 'asn-generator') pageTitle.innerText = 'ASN Generator Workflow';
+      if (targetId === 'inventory-analytics') pageTitle.innerText = 'Inventory Analytics';
+      if (targetId === 'empty-locations') pageTitle.innerText = 'Empty Locations';
+      if (targetId === 'master-data') {
+        pageTitle.innerText = 'Master Data Management';
+        fetchMasterDataStatus();
+      }
       if (targetId === 'logs') {
         pageTitle.innerText = 'Activity Logs';
         fetchLogs();
@@ -63,20 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   btnRefreshLogs.addEventListener('click', fetchLogs);
   btnCloseModal.addEventListener('click', () => resultModal.classList.remove('active'));
-  
-  // Open Folder Buttons
-  document.querySelectorAll('.btn-open-folder').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const folderType = e.target.closest('button').getAttribute('data-folder');
-      try {
-        await fetch(`/api/open-folder/${folderType}`, { method: 'POST' });
-      } catch (err) {
-        console.error('Failed to open folder', err);
-      }
-    });
-  });
 
-  // Upload Buttons
+  // Upload Buttons (PDF and Inventory)
   document.querySelectorAll('.btn-upload').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const folderType = e.target.closest('button').getAttribute('data-folder');
@@ -84,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Handle file selection for upload
+  // Handle file selection for upload (using FormData)
   ['inventory', 'pdf'].forEach(type => {
     const inputEl = document.getElementById(`file-upload-${type}`);
     if (inputEl) {
@@ -93,29 +118,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!files.length) return;
         
         loadingModal.classList.add('active');
-        document.getElementById('loading-text').innerText = 'Uploading files...';
+        document.getElementById('loading-text').innerText = 'Uploading files to cloud...';
         
-        for (const file of files) {
-          try {
-            const base64Str = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result);
-              reader.readAsDataURL(file);
-            });
-            
-            await fetch(`/api/upload/${type}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ filename: file.name, content: base64Str })
-            });
-          } catch (err) {
-            console.error('Upload failed', err);
+        try {
+          const formData = new FormData();
+          for (const file of files) {
+            formData.append('files', file);
           }
+          
+          const res = await fetch(`/api/upload/${type}`, {
+            method: 'POST',
+            body: formData,
+          });
+          const data = await res.json();
+          
+          if (!data.success) {
+            showResultModal(false, 'Upload Failed', `<p>${data.error}</p>`);
+          }
+        } catch (err) {
+          showResultModal(false, 'Upload Error', `<p>${err.message}</p>`);
         }
         
         loadingModal.classList.remove('active');
-        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.'; // reset
-        inputEl.value = ''; // reset input
+        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.';
+        inputEl.value = '';
         
         if (type === 'pdf') fetchPDFs();
         if (type === 'inventory') fetchInventoryFiles();
@@ -125,7 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Global Delete Listener Function for Input Files
   function attachInputDeleteListeners() {
-    // Remove old listeners to prevent duplicates by cloning
     document.querySelectorAll('.btn-delete-input').forEach(btn => {
       const newBtn = btn.cloneNode(true);
       btn.parentNode.replaceChild(newBtn, btn);
@@ -135,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const type = targetBtn.getAttribute('data-type');
         const filename = targetBtn.getAttribute('data-filename');
         
-        if (confirm(`Are you sure you want to delete ${filename}?`)) {
+        showConfirmModal('Delete File', `Are you sure you want to delete ${filename}?`, async () => {
           try {
             await fetch(`/api/delete/${type}/${encodeURIComponent(filename)}`, { method: 'DELETE' });
             if (type === 'pdf') fetchPDFs();
@@ -143,44 +168,44 @@ document.addEventListener('DOMContentLoaded', () => {
           } catch (err) {
             console.error('Delete failed', err);
           }
-        }
+        });
       });
     });
   }
-  
-  btnShutdown.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to stop the Agent Hub server? You will need to run the start file again to use it.')) {
-      try {
-        await fetch('/api/shutdown', { method: 'POST' });
-        document.body.innerHTML = '<div style="display:flex; height:100vh; align-items:center; justify-content:center; flex-direction:column; font-family:sans-serif;"><h2>Server Stopped</h2><p>You can safely close this browser tab.</p></div>';
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  });
 
+  // Generate ASN
   btnGenerate.addEventListener('click', async () => {
     if (pdfCountEl.innerText === '0') {
-      showResultModal(false, 'Warning', 'No PDF files found in Input folder.');
+      showResultModal(false, 'Warning', 'No PDF files found. Please upload PDFs first.');
       return;
     }
     
     loadingModal.classList.add('active');
+    document.getElementById('loading-text').innerText = 'Processing PDFs, assigning locations, generating ASN...';
     try {
       const res = await fetch('/api/generate', { method: 'POST' });
       const data = await res.json();
       loadingModal.classList.remove('active');
+      document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.';
       
       if (data.success) {
-        let html = `<ul>`;
+        let html = `<div class="asn-results-list">`;
         data.files.forEach(f => {
-          html += `<li><strong>${f.filename}</strong><br>
-          Locations assigned: ${f.locationCount} <br>
-          Pallets processed: ${f.palletCount}
-          ${f.insufficientLocs ? '<br><span style="color:var(--danger)">WARNING: Not enough locations!</span>' : ''}
-          </li>`;
+          html += `
+            <div class="asn-result-item">
+              <div class="asn-result-header">
+                <i class="fa-regular fa-file-excel" style="color: #10b981;"></i> 
+                <strong>${f.filename}</strong>
+              </div>
+              <div class="asn-result-stats">
+                <span class="stat-badge"><i class="fa-solid fa-map-location-dot"></i> ${f.locationCount} Locations</span>
+                <span class="stat-badge"><i class="fa-solid fa-boxes-stacked"></i> ${f.palletCount} Pallets</span>
+              </div>
+              ${f.insufficientLocs ? '<div class="asn-warning"><i class="fa-solid fa-triangle-exclamation"></i> WARNING: Not enough empty locations!</div>' : ''}
+            </div>
+          `;
         });
-        html += `</ul>`;
+        html += `</div>`;
         showResultModal(true, 'Generation Successful', html);
         refreshData();
       } else {
@@ -188,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       loadingModal.classList.remove('active');
+      document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.';
       showResultModal(false, 'Error', `<p>${err.message}</p>`);
     }
   });
@@ -199,37 +225,74 @@ document.addEventListener('DOMContentLoaded', () => {
   const wrongLocCount = document.getElementById('wrong-loc-count');
   const wrongPalletCount = document.getElementById('wrong-pallet-count');
   const btnDownloadWrongLoc = document.getElementById('btn-download-wrong-loc');
+  const radarAnim = document.getElementById('radar-anim');
+  const previewContainer = document.getElementById('wrong-loc-preview-container');
+  const previewBody = document.getElementById('wrong-loc-preview-body');
+
+  function animateValue(obj, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      obj.innerHTML = Math.floor(progress * (end - start) + start);
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    };
+    window.requestAnimationFrame(step);
+  }
 
   if (btnAnalyzeInventory) {
     btnAnalyzeInventory.addEventListener('click', async () => {
-      loadingModal.classList.add('active');
-      document.getElementById('loading-text').innerText = 'Analyzing inventory locations...';
+      radarAnim.classList.add('scanning');
+      inventoryAnalyzeResult.classList.add('hidden');
+      btnAnalyzeInventory.disabled = true;
+      btnAnalyzeInventory.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning...';
       
       try {
+        await new Promise(r => setTimeout(r, 1000));
+        
         const res = await fetch('/api/inventory/analyze', { method: 'POST' });
         const data = await res.json();
-        loadingModal.classList.remove('active');
-        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.'; // Reset text
+        
+        radarAnim.classList.remove('scanning');
+        btnAnalyzeInventory.disabled = false;
+        btnAnalyzeInventory.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Start Deep Scan';
         
         if (data.success) {
           inventoryAnalyzeResult.classList.remove('hidden');
           inventoryAnalyzeMsg.innerText = data.message;
-          wrongLocCount.innerText = data.wrongLocCount;
-          wrongPalletCount.innerText = data.wrongPalletCount;
+          
+          animateValue(wrongLocCount, 0, data.wrongLocCount || 0, 1000);
+          animateValue(wrongPalletCount, 0, data.wrongPalletCount || 0, 1000);
           
           if (data.wrongLocCount > 0) {
             btnDownloadWrongLoc.classList.remove('hidden');
-            showResultModal(true, 'Analysis Complete', `<p>${data.message}</p><p>Please download the report for details.</p>`);
+            
+            if (data.preview && data.preview.length > 0) {
+              previewContainer.classList.remove('hidden');
+              previewBody.innerHTML = data.preview.map(p => `
+                <tr>
+                  <td><strong>${p.loc}</strong></td>
+                  <td>${p.id}</td>
+                  <td>${p.sku}</td>
+                  <td>${p.batch}</td>
+                </tr>
+              `).join('');
+            } else {
+              previewContainer.classList.add('hidden');
+            }
           } else {
             btnDownloadWrongLoc.classList.add('hidden');
-            showResultModal(true, 'Analysis Complete', `<p>${data.message}</p>`);
+            previewContainer.classList.add('hidden');
           }
         } else {
           showResultModal(false, 'Analysis Failed', `<p>${data.error}</p>`);
         }
       } catch (err) {
-        loadingModal.classList.remove('active');
-        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.';
+        radarAnim.classList.remove('scanning');
+        btnAnalyzeInventory.disabled = false;
+        btnAnalyzeInventory.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Start Deep Scan';
         showResultModal(false, 'Error', `<p>${err.message}</p>`);
       }
     });
@@ -251,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch('/api/empty-locations/generate', { method: 'POST' });
         const data = await res.json();
         loadingModal.classList.remove('active');
-        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.'; // Reset text
+        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.';
         
         if (data.success) {
           emptyLocResult.classList.remove('hidden');
@@ -276,7 +339,86 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Data Fetching functions
+  // ============================================================================
+  // MASTER DATA MANAGEMENT
+  // ============================================================================
+  
+  // Upload Master Data buttons
+  document.querySelectorAll('.btn-upload-md').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const mdType = e.target.closest('button').getAttribute('data-md-type');
+      document.querySelector(`.md-file-input[data-md-type="${mdType}"]`).click();
+    });
+  });
+
+  // Handle Master Data file upload
+  document.querySelectorAll('.md-file-input').forEach(inputEl => {
+    inputEl.addEventListener('change', async (e) => {
+      const mdType = inputEl.getAttribute('data-md-type');
+      const file = e.target.files[0];
+      if (!file) return;
+
+      loadingModal.classList.add('active');
+      document.getElementById('loading-text').innerText = `Uploading ${file.name} to cloud...`;
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch(`/api/master-data/${mdType}`, {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+
+        loadingModal.classList.remove('active');
+        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.';
+
+        if (data.success) {
+          showResultModal(true, 'Upload Successful', `<p>${data.message}</p>`);
+          fetchMasterDataStatus();
+        } else {
+          showResultModal(false, 'Upload Failed', `<p>${data.error}</p>`);
+        }
+      } catch (err) {
+        loadingModal.classList.remove('active');
+        document.getElementById('loading-text').innerText = 'Extracting data from PDFs and mapping locations.';
+        showResultModal(false, 'Upload Error', `<p>${err.message}</p>`);
+      }
+
+      inputEl.value = '';
+    });
+  });
+
+  // Refresh Master Data status button
+  const btnRefreshMaster = document.getElementById('btn-refresh-master');
+  if (btnRefreshMaster) {
+    btnRefreshMaster.addEventListener('click', fetchMasterDataStatus);
+  }
+
+  async function fetchMasterDataStatus() {
+    try {
+      const res = await fetch('/api/master-data/status');
+      const data = await res.json();
+      if (data.success) {
+        for (const [key, info] of Object.entries(data.data)) {
+          const el = document.getElementById(`md-status-${key}`);
+          if (el) {
+            if (info.exists) {
+              el.innerHTML = '<span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> Uploaded</span>';
+            } else {
+              el.innerHTML = '<span style="color: var(--danger);"><i class="fa-solid fa-circle-xmark"></i> Not uploaded</span>';
+            }
+          }
+        }
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  // ============================================================================
+  // DATA FETCHING
+  // ============================================================================
+  
   async function refreshData() {
     fetchPDFs();
     fetchInventoryFiles();
@@ -292,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pdfCountEl.innerText = data.data.length;
         pdfListEl.innerHTML = '';
         if (data.data.length === 0) {
-          pdfListEl.innerHTML = '<li>No PDF files found. Please add to Input folder.</li>';
+          pdfListEl.innerHTML = '<li>No PDF files found. Please upload PDF files.</li>';
         } else {
           data.data.forEach(f => {
             pdfListEl.innerHTML += `<li style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -314,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.success) {
         inventoryListEl.innerHTML = '';
         if (data.data.length === 0) {
-          inventoryListEl.innerHTML = '<li>No Inventory files found. Please add to Input/Inventory folder.</li>';
+          inventoryListEl.innerHTML = '<li>No Inventory files found. Please upload an inventory file.</li>';
         } else {
           data.data.forEach(f => {
             inventoryListEl.innerHTML += `<li style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -344,8 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
           
           asnTableBody.innerHTML = '';
           data.data.forEach(f => {
-            const sizeKB = Math.round(f.size / 1024);
-            const dateStr = new Date(f.modified).toLocaleString();
+            const sizeKB = Math.round((f.size || 0) / 1024);
+            const dateStr = f.modified ? new Date(f.modified).toLocaleString() : '-';
             
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -364,10 +506,11 @@ document.addEventListener('DOMContentLoaded', () => {
           document.querySelectorAll('.btn-delete').forEach(btn => {
             btn.addEventListener('click', async (e) => {
               const filename = e.target.closest('button').getAttribute('data-filename');
-              if (confirm(`Delete ${filename}? This will free up the assigned locations.`)) {
+              if (!filename) return;
+              showConfirmModal('Delete ASN Output', `Delete ${filename}? This will free up the assigned locations.`, async () => {
                 await fetch(`/api/asn/${encodeURIComponent(filename)}`, { method: 'DELETE' });
                 refreshData();
-              }
+              });
             });
           });
         }
@@ -382,6 +525,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.success) {
         locAvailableEl.innerText = data.data.available;
         locBlockedEl.innerText = `${data.data.asnBlocked} blocked by active ASNs`;
+        if (locBlockedNonUseEl) {
+          locBlockedNonUseEl.innerText = `${data.data.nonUse} blocked by non use`;
+        }
       }
     } catch (e) { console.error(e); }
   }
@@ -396,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
           logListEl.innerHTML = '<p>No logs found.</p>';
         } else {
           data.data.forEach(log => {
-            const dateStr = new Date(log.modified).toLocaleString();
+            const dateStr = log.modified ? new Date(log.modified).toLocaleString() : '-';
             logListEl.innerHTML += `
               <div class="log-file">
                 <div class="log-file-header">
