@@ -1,3 +1,28 @@
+// Polyfill browser APIs required by pdf-parse/pdfjs-dist in Node.js serverless
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor(init) {
+      const v = Array.isArray(init) ? init : (typeof init === 'string' ? init.split(/[\s,]+/).map(Number) : []);
+      this.a = v[0] ?? 1; this.b = v[1] ?? 0;
+      this.c = v[2] ?? 0; this.d = v[3] ?? 1;
+      this.e = v[4] ?? 0; this.f = v[5] ?? 0;
+      this.m11 = this.a; this.m12 = this.b;
+      this.m21 = this.c; this.m22 = this.d;
+      this.m41 = this.e; this.m42 = this.f;
+      this.is2D = true; this.isIdentity = (this.a === 1 && this.b === 0 && this.c === 0 && this.d === 1 && this.e === 0 && this.f === 0);
+    }
+    inverse() { return new DOMMatrix(); }
+    multiply(other) { return new DOMMatrix(); }
+    translate(tx, ty) { return new DOMMatrix([this.a, this.b, this.c, this.d, this.e + tx, this.f + ty]); }
+    scale(sx, sy) { return new DOMMatrix([this.a * sx, this.b, this.c, this.d * (sy ?? sx), this.e, this.f]); }
+    transformPoint(p) { return { x: this.a * p.x + this.c * p.y + this.e, y: this.b * p.x + this.d * p.y + this.f }; }
+    toString() { return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`; }
+  };
+}
+if (typeof globalThis.Path2D === 'undefined') {
+  globalThis.Path2D = class Path2D { constructor() {} addPath() {} closePath() {} moveTo() {} lineTo() {} bezierCurveTo() {} quadraticCurveTo() {} arc() {} arcTo() {} ellipse() {} rect() {} };
+}
+
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
