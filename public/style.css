@@ -892,15 +892,15 @@ tr:hover {
   font-size: 0.83rem;
 }
 .ta-result-table thead th {
-  padding: 8px 12px;
+  padding: 10px 12px;
   text-align: left;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: #fff;
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #fafbfc;
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #4361ee, #5b6abf);
+  border-bottom: 2px solid #3a56d4;
 }
 .ta-result-table tbody td {
   padding: 8px 12px;
