@@ -1,3 +1,22 @@
+/**
+ * ===================================================================
+ * TRUCK LOAD ALLOCATION ENGINE
+ * ===================================================================
+ * 
+ * Version 1 (v1) — "Pallet-First Bin Packing"
+ *   Strategy: Pre-split → Full-Pallet allocation → Odd-Carton consolidation
+ *   - STEP 0: Force-assign priority items with specified truck type
+ *   - STEP 1: Split each SKU into full-pallet units + odd-carton remainder
+ *   - STEP 2: Allocate full pallets across trucks (best-fit descending)
+ *   - STEP 3: Consolidate all odd cartons per SKU into ONE truck (best-fit)
+ * 
+ * Version 2 (v2) — TBD (reserved for future logic improvement)
+ *   If v2 doesn't perform well, system can revert to v1.
+ * 
+ * Active Version: v1
+ * ===================================================================
+ */
+
 const XLSX = require('xlsx');
 
 // Standard Truck Capacities (kg)
@@ -384,6 +403,10 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         // Remove fully allocated lines
         lines = lines.filter(l => l.cartons > 0);
       }
+
+      // ============================================================
+      // ALLOCATION LOGIC — VERSION 1: Pallet-First Bin Packing
+      // ============================================================
 
       // === STEP 1: Pre-split every SKU into full-pallet items and odd-carton items ===
       const fullPalletItems = [];
