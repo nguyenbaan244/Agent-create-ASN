@@ -255,12 +255,22 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
     });
 
     if (palletColIdx === -1 && headerRowIdxJS !== -1) {
-      palletColIdx = templateSheet.columnCount + 1;
-      const hCell = templateSheet.getCell(headerRowIdxJS, palletColIdx);
-      hCell.value = 'Số lượng Pallet';
-      const adjacentCell = templateSheet.getCell(headerRowIdxJS, palletColIdx - 1);
-      hCell.style = adjacentCell ? adjacentCell.style : {};
-      templateSheet.getColumn(palletColIdx).width = 15;
+      if (truckColIdx !== -1) {
+        palletColIdx = truckColIdx + 1;
+        templateSheet.spliceColumns(palletColIdx, 0, []); // Insert empty column after Size Truck
+        const hCell = templateSheet.getCell(headerRowIdxJS, palletColIdx);
+        hCell.value = 'Số lượng pallet';
+        const adjacentCell = templateSheet.getCell(headerRowIdxJS, truckColIdx);
+        hCell.style = adjacentCell ? adjacentCell.style : {};
+        templateSheet.getColumn(palletColIdx).width = 15;
+      } else {
+        palletColIdx = templateSheet.columnCount + 1;
+        const hCell = templateSheet.getCell(headerRowIdxJS, palletColIdx);
+        hCell.value = 'Số lượng pallet';
+        const adjacentCell = templateSheet.getCell(headerRowIdxJS, palletColIdx - 1);
+        hCell.style = adjacentCell ? adjacentCell.style : {};
+        templateSheet.getColumn(palletColIdx).width = 15;
+      }
     }
 
     const generatedSheets = [];
@@ -391,6 +401,68 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
       const styleTemplateRow = templateSheet.getRow(headerRowIdxJS + 1);
       let currentRow = headerRowIdxJS + 1;
       
+      let originalTotalWeight = 0;
+      let originalTotalCartons = 0;
+      let originalTotalPcs = 0;
+
+      // 1. Output Original PO lines (Đề bài)
+      for (let i = headerRowIdx + 1; i < data.length; i++) {
+        if (data[i] && data[i][poIdx] && data[i][poIdx].toString().trim() === poName) {
+           const destRow = newSheet.getRow(currentRow++);
+           destRow.height = styleTemplateRow.height;
+           
+           styleTemplateRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+             const destCell = destRow.getCell(colNumber);
+             destCell.style = cell.style;
+             
+             let val;
+             if (colNumber === palletColIdx) {
+                const sku = data[i][skuIdx];
+                const cartons = parseFloat(data[i][cartonIdx]) || 0;
+                const casePallet = (spec.items[sku] && spec.items[sku].casePallet) ? spec.items[sku].casePallet : 0;
+                const pallets = casePallet ? (cartons / casePallet) : 0;
+                val = pallets ? parseFloat(pallets.toFixed(2)) : null;
+             } else if (colNumber > palletColIdx) {
+                val = data[i][colNumber - 2];
+             } else {
+                val = data[i][colNumber - 1];
+             }
+             destCell.value = val !== undefined ? val : null;
+           });
+           
+           const cartons = parseFloat(data[i][cartonIdx]) || 0;
+           const sku = data[i][skuIdx] ? data[i][skuIdx].toString().trim() : '';
+           const itemSpec = spec.items[sku] || {};
+           const weightPerCarton = parseFloat(data[i][weightIdx]) || itemSpec.weightCase || 0;
+           const weight = cartons * weightPerCarton;
+           
+           if (truckColIdx !== -1) destRow.getCell(truckColIdx).value = weight;
+           
+           originalTotalWeight += weight;
+           originalTotalCartons += cartons;
+           originalTotalPcs += parseFloat(data[i][pcsIdx]) || 0;
+        }
+      }
+
+      // Total row for original lines
+      const totalRow = newSheet.getRow(currentRow++);
+      const tLabelCol = truckColIdx !== -1 ? truckColIdx - 3 : 1;
+      totalRow.getCell(tLabelCol).value = 'Total';
+      if (pcsColIdx !== -1) totalRow.getCell(pcsColIdx).value = originalTotalPcs;
+      if (cartonColIdx !== -1) totalRow.getCell(cartonColIdx).value = originalTotalCartons;
+      if (truckColIdx !== -1) totalRow.getCell(truckColIdx).value = (originalTotalWeight / 1000).toFixed(2) + ' Ton';
+      
+      totalRow.eachCell(c => {
+         c.font = { bold: true, color: { argb: 'FFFF0000' } }; // Red font
+      });
+      if (truckColIdx !== -1) {
+         totalRow.getCell(truckColIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+         totalRow.getCell(palletColIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+      }
+
+      currentRow++; // Blank row separator
+      
+      // 2. Output Truck Allocations
       for (const truck of truckPool) {
         if (truck.items.length === 0) continue;
         
@@ -401,7 +473,14 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
           styleTemplateRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             const destCell = destRow.getCell(colNumber);
             destCell.style = cell.style;
-            let val = item.row[colNumber - 1]; // SheetJS 0-indexed array
+            let val;
+            if (colNumber === palletColIdx) {
+                // skip, computed below
+            } else if (colNumber > palletColIdx) {
+                val = item.row[colNumber - 2];
+            } else {
+                val = item.row[colNumber - 1];
+            }
             destCell.value = val !== undefined ? val : null;
           });
           
@@ -421,7 +500,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
           }
         }
         
-        // Add subtotal row
+        // Add subtotal row for truck
         const subtotalRow = newSheet.getRow(currentRow++);
         const targetLabelCol = truckColIdx !== -1 ? truckColIdx - 1 : 1;
         const targetValCol = truckColIdx !== -1 ? truckColIdx : 2;
@@ -429,8 +508,12 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         subtotalRow.getCell(targetLabelCol).value = `XE ${truck.id}`;
         subtotalRow.getCell(targetValCol).value = truck.currentWeight;
         
-        // Bold formatting for subtotal
+        // Bold formatting and yellow BG for subtotal
         subtotalRow.eachCell(c => c.font = { bold: true });
+        subtotalRow.getCell(targetValCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        if (palletColIdx !== -1) {
+           subtotalRow.getCell(palletColIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        }
         
         currentRow++; // Empty row separation
       }
