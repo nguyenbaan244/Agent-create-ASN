@@ -42,6 +42,7 @@ function parseGoodsSpec(buffer) {
   const pcsPalletIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'pcs/pallet');
   const casePalletIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'case/pallet');
   const pcsCaseIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'pcs/case');
+  const cbmCaseIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim().includes('cbm'));
 
   for (let i = headerRowIdx + 1; i < data.length; i++) {
     const row = data[i];
@@ -55,7 +56,8 @@ function parseGoodsSpec(buffer) {
       weightCase: parseFloat(row[weightCaseIdx]) || 0,
       pcsPallet: parseFloat(row[pcsPalletIdx]) || 0,
       casePallet: parseFloat(row[casePalletIdx]) || 0,
-      pcsCase: parseFloat(row[pcsCaseIdx]) || 1
+      pcsCase: parseFloat(row[pcsCaseIdx]) || 1,
+      cbmCase: cbmCaseIdx !== -1 ? (parseFloat(row[cbmCaseIdx]) || 0) : 0
     };
   }
 
@@ -271,6 +273,18 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         hCell.style = adjacentCell ? adjacentCell.style : {};
         templateSheet.getColumn(palletColIdx).width = 15;
       }
+    }
+
+    // Insert CBM column right after the Pallet column
+    let cbmColIdx = -1;
+    if (palletColIdx !== -1 && headerRowIdxJS !== -1) {
+      cbmColIdx = palletColIdx + 1;
+      templateSheet.spliceColumns(cbmColIdx, 0, []);
+      const cbmHeader = templateSheet.getCell(headerRowIdxJS, cbmColIdx);
+      cbmHeader.value = 'CBM';
+      const refCell = templateSheet.getCell(headerRowIdxJS, palletColIdx);
+      cbmHeader.style = refCell ? refCell.style : {};
+      templateSheet.getColumn(cbmColIdx).width = 12;
     }
 
     const generatedSheets = [];
@@ -496,6 +510,8 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
           items: t.items.map(item => {
             const casePallet = spec.items[item.sku] ? spec.items[item.sku].casePallet : 0;
             const pallets = casePallet ? Math.round((item.cartons / casePallet) * 100) / 100 : 0;
+            const cbmCase = spec.items[item.sku] ? spec.items[item.sku].cbmCase : 0;
+            const cbm = cbmCase ? Math.round(item.cartons * cbmCase * 1000) / 1000 : 0;
             return {
               sku: item.sku,
               desc: item.row[skuIdx + 1] || '',
@@ -503,7 +519,8 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
               cartons: item.cartons,
               pcs: item.pcs,
               weight: Math.round(item.totalWeight * 100) / 100,
-              pallets
+              pallets,
+              cbm
             };
           })
         }))
@@ -524,6 +541,9 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
       newSheet.columns = templateSheet.columns.map(c => ({ width: c.width }));
       if (templateSheet.getColumn(palletColIdx)) {
          newSheet.getColumn(palletColIdx).width = templateSheet.getColumn(palletColIdx).width || 15;
+      }
+      if (cbmColIdx !== -1) {
+         newSheet.getColumn(cbmColIdx).width = 12;
       }
       
       // Clone header and rows above
@@ -554,20 +574,27 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
            styleTemplateRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
              const destCell = destRow.getCell(colNumber);
              destCell.style = cell.style;
-             
-             let val;
-             if (colNumber === palletColIdx) {
-                const sku = data[i][skuIdx];
-                const cartons = parseFloat(data[i][cartonIdx]) || 0;
-                const casePallet = (spec.items[sku] && spec.items[sku].casePallet) ? spec.items[sku].casePallet : 0;
-                const pallets = casePallet ? (cartons / casePallet) : 0;
-                val = pallets ? parseFloat(pallets.toFixed(2)) : null;
-             } else if (colNumber > palletColIdx) {
-                val = data[i][colNumber - 2];
-             } else {
-                val = data[i][colNumber - 1];
-             }
-             destCell.value = val !== undefined ? val : null;
+                          let val;
+              if (colNumber === palletColIdx) {
+                 const sku = data[i][skuIdx];
+                 const cartons = parseFloat(data[i][cartonIdx]) || 0;
+                 const casePallet = (spec.items[sku] && spec.items[sku].casePallet) ? spec.items[sku].casePallet : 0;
+                 const pallets = casePallet ? (cartons / casePallet) : 0;
+                 val = pallets ? parseFloat(pallets.toFixed(2)) : null;
+              } else if (colNumber === cbmColIdx) {
+                 const sku = data[i][skuIdx];
+                 const cartons = parseFloat(data[i][cartonIdx]) || 0;
+                 const cbmCase = (spec.items[sku] && spec.items[sku].cbmCase) ? spec.items[sku].cbmCase : 0;
+                 val = cbmCase ? parseFloat((cartons * cbmCase).toFixed(3)) : null;
+              } else if (colNumber > (cbmColIdx !== -1 ? cbmColIdx : palletColIdx)) {
+                 const offset = (cbmColIdx !== -1 ? 2 : 1);
+                 val = data[i][colNumber - 1 - offset];
+              } else if (colNumber > palletColIdx) {
+                 val = data[i][colNumber - 2];
+              } else {
+                 val = data[i][colNumber - 1];
+              }
+              destCell.value = val !== undefined ? val : null;
            });
            
            const cartons = parseFloat(data[i][cartonIdx]) || 0;
@@ -616,6 +643,11 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
             let val;
             if (colNumber === palletColIdx) {
                 // skip, computed below
+            } else if (colNumber === cbmColIdx) {
+                // skip, computed below
+            } else if (colNumber > (cbmColIdx !== -1 ? cbmColIdx : palletColIdx)) {
+                const offset = (cbmColIdx !== -1 ? 2 : 1);
+                val = item.row[colNumber - 1 - offset];
             } else if (colNumber > palletColIdx) {
                 val = item.row[colNumber - 2];
             } else {
@@ -638,6 +670,14 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
              const adjacentStyle = styleTemplateRow.getCell(palletColIdx - 1);
              pCell.style = adjacentStyle ? adjacentStyle.style : {};
           }
+          if (cbmColIdx !== -1) {
+             const cbmCase = spec.items[item.sku] ? spec.items[item.sku].cbmCase : 0;
+             const cbm = cbmCase ? item.cartons * cbmCase : 0;
+             const cCell = destRow.getCell(cbmColIdx);
+             cCell.value = parseFloat(cbm.toFixed(3));
+             const adjacentStyle = styleTemplateRow.getCell(palletColIdx - 1);
+             cCell.style = adjacentStyle ? adjacentStyle.style : {};
+          }
         }
         
         // Add subtotal row for truck
@@ -653,6 +693,9 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         subtotalRow.getCell(targetValCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
         if (palletColIdx !== -1) {
            subtotalRow.getCell(palletColIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        }
+        if (cbmColIdx !== -1) {
+           subtotalRow.getCell(cbmColIdx).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
         }
         
         currentRow++; // Empty row separation

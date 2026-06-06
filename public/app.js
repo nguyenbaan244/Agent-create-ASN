@@ -753,6 +753,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const isFullPallet = Number.isInteger(item.pallets) && item.pallets > 0;
           const palletClass = isFullPallet ? 'full' : 'partial';
           const palletLabel = item.pallets > 0 ? item.pallets.toFixed(2) : '-';
+          const cbmLabel = item.cbm > 0 ? item.cbm.toFixed(3) : '-';
           
           return `<tr>
             <td class="sku-cell">${item.sku}</td>
@@ -762,6 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td class="num">${item.cartons.toLocaleString()}</td>
             <td class="num">${item.weight.toLocaleString()}</td>
             <td class="num"><span class="pallet-chip ${palletClass}">${palletLabel}</span></td>
+            <td class="num">${cbmLabel}</td>
           </tr>`;
         }).join('');
         
@@ -786,6 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <th>SKU</th><th>Description</th><th>Batch</th>
               <th style="text-align:right">PCS</th><th style="text-align:right">Cartons</th>
               <th style="text-align:right">Weight</th><th style="text-align:right">Pallets</th>
+              <th style="text-align:right">CBM</th>
             </tr></thead>
             <tbody>${itemsHtml}</tbody>
           </table>
