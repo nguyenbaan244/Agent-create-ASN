@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const skusOptions = po.skus.map(sku => `<option value="${sku}">${sku}</option>`).join('');
       const batchesOptions = po.batches.map(b => `<option value="${b}">${b}</option>`).join('');
       
-      const hideCols = ['SO', 'Type', 'Request to DC', 'OB', 'Delivery date', 'Size Truck', 'Address', 'DN'];
+      const hideCols = ['SO', 'Request to DC', 'OB', 'Delivery date', 'Size Truck', 'Address', 'DN'];
       const visibleHeaders = taHeaders.filter(h => !hideCols.includes(h));
       const thStyle = `padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: #fff; background: linear-gradient(135deg, #4361ee, #5b6abf); white-space: nowrap;`;
       const numCols = ['Carton', 'Kg', 'PCS', 'Pcs', 'Weight', 'pcs'];
@@ -778,6 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td class="sku-cell">${item.sku}</td>
             <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.desc}">${item.desc}</td>
             <td>${item.batch}</td>
+            <td>${item.itemType || ''}</td>
             <td class="num">${item.pcs.toLocaleString()}</td>
             <td class="num">${item.cartons.toLocaleString()}</td>
             <td class="num">${item.weight.toLocaleString()}</td>
@@ -794,7 +795,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tCbm = truck.items.reduce((s, i) => s + (i.cbm || 0), 0);
         
         const totalRowHtml = `<tr class="ta-total-row">
-          <td colspan="3" style="font-weight:700; color:var(--primary);">Total XE ${truck.id}</td>
+          <td colspan="4" style="font-weight:700; color:var(--primary);">Total XE ${truck.id}</td>
           <td class="num">${tPcs.toLocaleString()}</td>
           <td class="num">${tCartons.toLocaleString()}</td>
           <td class="num">${tWeight.toLocaleString()}</td>
@@ -820,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <table class="ta-result-table">
             <thead><tr>
-              <th>SKU</th><th>Description</th><th>Batch</th>
+              <th>SKU</th><th>Description</th><th>Batch</th><th>Type</th>
               <th style="text-align:right">PCS</th><th style="text-align:right">Cartons</th>
               <th style="text-align:right">Weight</th><th style="text-align:right">Pallets</th>
               <th style="text-align:right">CBM</th>

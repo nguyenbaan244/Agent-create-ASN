@@ -208,6 +208,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
     const pcsIdx = headers.findIndex(h => h && h.toString().includes('PCS'));
     const cartonIdx = headers.findIndex(h => h && h.toString().includes('Carton'));
     const weightIdx = headers.findIndex(h => h && h.toString().includes('Kg/Car'));
+    const typeIdx = headers.findIndex(h => h && h.toString().trim() === 'Type');
 
     // Load ExcelJS for formatting preservation
     const outWb = new ExcelJS.Workbook();
@@ -319,7 +320,9 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
             if (priorities[2] && priorities[2].batch && batch === priorities[2].batch) priorityScore += 10;
           }
           
-          lines.push({ row, sku, batch, pcs, cartons, weightPerCarton, totalWeight, priorityScore });
+          const itemType = typeIdx !== -1 && row[typeIdx] ? row[typeIdx].toString().trim() : '';
+          
+          lines.push({ row, sku, batch, pcs, cartons, weightPerCarton, totalWeight, priorityScore, itemType });
         }
       }
 
@@ -557,6 +560,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
               sku: item.sku,
               desc: item.row[skuIdx + 1] || '',
               batch: item.batch,
+              itemType: item.itemType || '',
               cartons: item.cartons,
               pcs: item.pcs,
               weight: Math.round(item.totalWeight * 100) / 100,
