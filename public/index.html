@@ -25,6 +25,9 @@
         <li class="nav-item active" data-tab="asn-generator">
           <i class="fa-solid fa-file-excel"></i> ASN Generator
         </li>
+        <li class="nav-item" data-tab="truck-allocation">
+          <i class="fa-solid fa-truck-fast"></i> Truck Allocation
+        </li>
         <li class="nav-item" data-tab="inventory-analytics">
           <i class="fa-solid fa-chart-pie"></i> Wrong Location
         </li>
@@ -271,6 +274,40 @@
                 <a id="btn-download-empty-loc" href="/api/empty-locations/download" class="btn-primary hidden" download style="display: inline-flex; text-decoration: none;">
                   <i class="fa-solid fa-download"></i> Download Excel
                 </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4.5: Truck Allocation -->
+        <div id="truck-allocation" class="tab-content">
+          <div class="action-panel">
+            <div class="panel-header">
+              <h2><i class="fa-solid fa-truck-fast"></i> Truck Load Allocation</h2>
+              <button id="btn-refresh-ta" class="btn-icon"><i class="fa-solid fa-rotate-right"></i></button>
+            </div>
+            <div class="panel-body">
+              <p>Upload an Outbound Request (PO) file. The system will extract POs and allow you to allocate trucks dynamically.</p>
+              
+              <div style="display: flex; gap: 16px; align-items: center; margin-top: 16px;">
+                <input type="file" id="file-upload-ta" style="display: none;" accept=".xlsx,.xls">
+                <button class="btn-primary" onclick="document.getElementById('file-upload-ta').click()">
+                  <i class="fa-solid fa-file-import"></i> Upload OB Request
+                </button>
+                <span id="ta-file-name" style="color: var(--text-muted);">No file selected</span>
+              </div>
+              
+              <div id="ta-po-container" class="ta-po-container hidden" style="margin-top: 24px; display: flex; flex-direction: column; gap: 16px;">
+                <!-- Dynamically populated PO cards -->
+              </div>
+
+              <div id="ta-actions" class="hidden" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: flex-end; align-items: center;">
+                 <a id="btn-download-ta" class="btn-primary hidden" style="margin-right: 16px; text-decoration: none;" download>
+                    <i class="fa-solid fa-download"></i> Download Allocation
+                 </a>
+                 <button id="btn-execute-ta" class="btn-primary btn-large">
+                   <i class="fa-solid fa-gears"></i> Process Allocation
+                 </button>
               </div>
             </div>
           </div>

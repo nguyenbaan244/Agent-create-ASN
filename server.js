@@ -31,6 +31,7 @@ const asnAgent = require('./generate_asn');
 const inventoryAnalyzer = require('./inventory_analyze');
 const emptyLocation = require('./empty_location');
 const storage = require('./supabase-storage');
+const truckAllocation = require('./truck_allocation');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -331,6 +332,55 @@ app.get('/api/empty-locations/download', async (req, res) => {
     res.send(buffer);
   } catch (error) {
     res.status(404).send('File not found. Please run the extraction first.');
+  }
+});
+
+// ============================================================================
+// TRUCK ALLOCATION APIs
+// ============================================================================
+
+// 14. Preview OB Request
+app.post('/api/truck-allocation/preview', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+    
+    // Save the file to Supabase (temporary input)
+    const filename = `TA_${Date.now()}_${req.file.originalname}`;
+    await storage.uploadFile(storage.FOLDERS.inputOutbound || 'input/outbound', filename, req.file.buffer, req.file.mimetype);
+    
+    const result = truckAllocation.preview(req.file.buffer);
+    result.filename = filename; // send filename to UI for execute
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 15. Execute Truck Allocation
+app.post('/api/truck-allocation/execute', async (req, res) => {
+  try {
+    const { filename, config } = req.body;
+    if (!filename || !config) return res.status(400).json({ success: false, error: 'Missing configuration or filename' });
+
+    // Download OB Request
+    const obBuffer = await storage.downloadFile(storage.FOLDERS.inputOutbound || 'input/outbound', filename);
+    
+    // Download Goods Spec
+    const masterData = await storage.downloadAllMasterData();
+    const goodsSpecBuffer = masterData.goodsSpecBuffer; // Might be null if missing, that's handled in logic
+
+    const result = truckAllocation.execute(obBuffer, goodsSpecBuffer, config);
+    
+    if (result.success && result.outputBuffer) {
+      const outputFilename = `Truck_Allocation_${Date.now()}.xlsx`;
+      await storage.uploadFile(storage.FOLDERS.asnOutput || 'output/asn', outputFilename, result.outputBuffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      delete result.outputBuffer;
+      result.outputFile = outputFilename;
+    }
+    
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

@@ -573,4 +573,174 @@ document.addEventListener('DOMContentLoaded', () => {
     resultModal.classList.add('active');
   }
 
+  // ============================================================================
+  // TRUCK ALLOCATION
+  // ============================================================================
+  const taFileUpload = document.getElementById('file-upload-ta');
+  const taFileName = document.getElementById('ta-file-name');
+  const taPoContainer = document.getElementById('ta-po-container');
+  const taActions = document.getElementById('ta-actions');
+  const btnExecuteTa = document.getElementById('btn-execute-ta');
+  const btnDownloadTa = document.getElementById('btn-download-ta');
+  const btnRefreshTa = document.getElementById('btn-refresh-ta');
+  
+  let taPOs = [];
+  let taFilenameOnServer = '';
+
+  if (btnRefreshTa) {
+    btnRefreshTa.addEventListener('click', () => {
+      taFileUpload.value = '';
+      taFileName.innerText = 'No file selected';
+      taPoContainer.classList.add('hidden');
+      taActions.classList.add('hidden');
+      taPoContainer.innerHTML = '';
+      btnDownloadTa.classList.add('hidden');
+    });
+  }
+
+  if (taFileUpload) {
+    taFileUpload.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      taFileName.innerText = file.name;
+      
+      loadingModal.classList.add('active');
+      document.getElementById('loading-text').innerText = 'Uploading OB Request and extracting POs...';
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const res = await fetch('/api/truck-allocation/preview', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        
+        loadingModal.classList.remove('active');
+        
+        if (data.success) {
+          taPOs = data.pos;
+          taFilenameOnServer = data.filename;
+          renderTaPOs();
+          taPoContainer.classList.remove('hidden');
+          taActions.classList.remove('hidden');
+          btnDownloadTa.classList.add('hidden');
+        } else {
+          showResultModal(false, 'Preview Failed', `<p>${data.error}</p>`);
+        }
+      } catch (err) {
+        loadingModal.classList.remove('active');
+        showResultModal(false, 'Upload Error', `<p>${err.message}</p>`);
+      }
+    });
+  }
+
+  function renderTaPOs() {
+    taPoContainer.innerHTML = taPOs.map((po, index) => {
+      const skusOptions = po.skus.map(sku => `<option value="${sku}">${sku}</option>`).join('');
+      const batchesOptions = po.batches.map(b => `<option value="${b}">${b}</option>`).join('');
+      
+      return `
+      <div class="ta-po-card" data-index="${index}">
+        <div class="ta-po-header">
+          <div class="ta-po-title">PO: ${po.poName}</div>
+          <div class="ta-po-stats">
+            <span><strong>${po.totalCartons.toFixed(2)}</strong> Cartons</span>
+            <span><strong>${po.totalWeight.toFixed(2)}</strong> Kg</span>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text);">Allocate Trucks</div>
+        <div class="ta-truck-inputs">
+          <div class="ta-input-group">
+            <label>2 Tons</label>
+            <input type="number" min="0" value="0" class="truck-input" data-type="2T">
+          </div>
+          <div class="ta-input-group">
+            <label>5 Tons</label>
+            <input type="number" min="0" value="0" class="truck-input" data-type="5T">
+          </div>
+          <div class="ta-input-group">
+            <label>8 Tons</label>
+            <input type="number" min="0" value="0" class="truck-input" data-type="8T">
+          </div>
+          <div class="ta-input-group">
+            <label>15 Tons</label>
+            <input type="number" min="0" value="0" class="truck-input" data-type="15T">
+          </div>
+          <div class="ta-input-group">
+            <label>Cont 40ft</label>
+            <input type="number" min="0" value="0" class="truck-input" data-type="Cont40">
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text);">Priorities (Top 1)</div>
+        <div class="ta-truck-inputs">
+          <div class="ta-input-group">
+            <label>Priority SKU</label>
+            <select class="priority-sku">
+              <option value="">-- None --</option>
+              ${skusOptions}
+            </select>
+          </div>
+          <div class="ta-input-group">
+            <label>Priority Batch</label>
+            <select class="priority-batch">
+              <option value="">-- None --</option>
+              ${batchesOptions}
+            </select>
+          </div>
+        </div>
+      </div>
+      `;
+    }).join('');
+  }
+
+  if (btnExecuteTa) {
+    btnExecuteTa.addEventListener('click', async () => {
+      // Gather config
+      const config = [];
+      document.querySelectorAll('.ta-po-card').forEach(card => {
+        const index = card.getAttribute('data-index');
+        const poName = taPOs[index].poName;
+        const trucks = {};
+        card.querySelectorAll('.truck-input').forEach(inp => {
+          if (parseInt(inp.value) > 0) {
+            trucks[inp.getAttribute('data-type')] = parseInt(inp.value);
+          }
+        });
+        const prioritySku = card.querySelector('.priority-sku').value;
+        const priorityBatch = card.querySelector('.priority-batch').value;
+        
+        config.push({ poName, trucks, prioritySku, priorityBatch });
+      });
+      
+      loadingModal.classList.add('active');
+      document.getElementById('loading-text').innerText = 'Running allocation algorithm...';
+      
+      try {
+        const res = await fetch('/api/truck-allocation/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: taFilenameOnServer, config })
+        });
+        const data = await res.json();
+        
+        loadingModal.classList.remove('active');
+        
+        if (data.success) {
+          showResultModal(true, 'Allocation Complete', `<p>Trucks successfully allocated for ${data.posCount} POs.</p>`);
+          btnDownloadTa.href = `/api/download/${encodeURIComponent(data.outputFile)}`;
+          btnDownloadTa.classList.remove('hidden');
+        } else {
+          showResultModal(false, 'Allocation Failed', `<p>${data.error}</p>`);
+        }
+      } catch (err) {
+        loadingModal.classList.remove('active');
+        showResultModal(false, 'Execution Error', `<p>${err.message}</p>`);
+      }
+    });
+  }
+
 });
