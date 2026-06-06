@@ -632,6 +632,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Always default to V2 on page load (override browser form cache)
+  const v2Default = document.querySelector('input[name="ta-version"][value="v2"]');
+  if (v2Default) v2Default.checked = true;
+
   if (btnRefreshTa) {
     const confirmModal = document.getElementById('confirm-modal');
     const btnYes = document.getElementById('btn-confirm-yes');
