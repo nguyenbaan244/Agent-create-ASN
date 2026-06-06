@@ -187,7 +187,8 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
 
     const spec = parseGoodsSpec(goodsSpecBuffer);
     const wb = XLSX.read(obBuffer, { type: 'buffer' });
-    const sheetName = wb.SheetNames[0];
+    let sheetName = wb.SheetNames.find(n => n.toUpperCase() === 'PHUONG');
+    if (!sheetName) sheetName = wb.SheetNames[0];
     const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 });
 
     let headerRowIdx = -1;
@@ -210,7 +211,21 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
     // Load ExcelJS for formatting preservation
     const outWb = new ExcelJS.Workbook();
     await outWb.xlsx.load(obBuffer);
-    const templateSheet = outWb.worksheets[0];
+    
+    // Clean up sheets as requested
+    outWb.eachSheet((ws, id) => {
+      const name = ws.name.toUpperCase();
+      if ((ws.state === 'hidden' || ws.state === 'veryHidden') && name.includes('PO')) {
+        outWb.removeWorksheet(id);
+      }
+      if (name.includes('MASTER DATA') || name.includes('LIST ADDRESS')) {
+        ws.state = 'hidden';
+      }
+    });
+
+    let templateSheet = outWb.getWorksheet('PHUONG') || outWb.getWorksheet(sheetName);
+    if (!templateSheet) templateSheet = outWb.worksheets[0];
+
     templateSheet.name = `Template_Temp_${Date.now()}`;
     
     let headerRowIdxJS = -1;
