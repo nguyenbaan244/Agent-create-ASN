@@ -255,9 +255,9 @@ function execute(obBuffer, goodsSpecBuffer, config) {
         let remainingPcs = line.pcs;
         
         while (remainingCartons > 0 && truckPool.length > 0) {
-          // Find first truck with space
-          const truck = truckPool.find(t => t.currentWeight < t.capacity);
-          if (!truck) break; // All trucks full!
+          // Find first truck with enough space for at least 1 carton
+          const truck = truckPool.find(t => (t.capacity - t.currentWeight) >= (line.weightPerCarton || 1));
+          if (!truck) break; // All trucks full or cannot fit even 1 carton of this item
           
           const availableWeight = truck.capacity - truck.currentWeight;
           const maxCartonsCanFit = availableWeight / (line.weightPerCarton || 1);
