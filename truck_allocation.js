@@ -347,6 +347,12 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         }
       }
 
+      // Remove existing sheet with the same name if it exists in the original workbook
+      const existingSheet = outWb.getWorksheet(poName);
+      if (existingSheet) {
+        outWb.removeWorksheet(existingSheet.id);
+      }
+
       // Generate Sheet for this PO using ExcelJS to preserve formatting
       const newSheet = outWb.addWorksheet(poName);
       generatedSheets.push(poName);
