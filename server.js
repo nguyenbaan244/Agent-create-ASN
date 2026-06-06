@@ -369,7 +369,7 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
     const masterData = await storage.downloadAllMasterData();
     const goodsSpecBuffer = masterData.goodsSpecBuffer; // Might be null if missing, that's handled in logic
 
-    const result = await truckAllocation.execute(obBuffer, goodsSpecBuffer, config, version || 'v1');
+    const result = await truckAllocation.execute(obBuffer, goodsSpecBuffer, config, version || 'v2');
     
     if (result.success && result.outputBuffer) {
       // Extract date from OB Request filename (e.g. "03. Total OB request - 05.06.2026.xlsx")
