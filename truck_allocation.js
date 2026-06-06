@@ -176,8 +176,15 @@ function preview(obBuffer) {
   }
 }
 
-function execute(obBuffer, goodsSpecBuffer, config) {
+async function execute(obBuffer, goodsSpecBuffer, config) {
   try {
+    let ExcelJS;
+    try {
+      ExcelJS = require('exceljs');
+    } catch(e) {
+      ExcelJS = require('C:/Users/Admin/.gemini/antigravity/scratch_npm/node_modules/exceljs');
+    }
+
     const spec = parseGoodsSpec(goodsSpecBuffer);
     const wb = XLSX.read(obBuffer, { type: 'buffer' });
     const sheetName = wb.SheetNames[0];
@@ -200,7 +207,49 @@ function execute(obBuffer, goodsSpecBuffer, config) {
     const cartonIdx = headers.findIndex(h => h && h.toString().includes('Carton'));
     const weightIdx = headers.findIndex(h => h && h.toString().includes('Kg/Car'));
 
-    const outWb = XLSX.utils.book_new();
+    // Load ExcelJS for formatting preservation
+    const outWb = new ExcelJS.Workbook();
+    await outWb.xlsx.load(obBuffer);
+    const templateSheet = outWb.worksheets[0];
+    
+    let headerRowIdxJS = -1;
+    let palletColIdx = -1;
+    let cartonColIdx = -1;
+    let pcsColIdx = -1;
+    let poColIdx = -1;
+    let weightColIdx = -1;
+    let truckColIdx = -1;
+    
+    templateSheet.eachRow((row, rowNumber) => {
+      if (headerRowIdxJS !== -1) return;
+      row.eachCell((cell, colNumber) => {
+        const val = cell.value ? String(cell.value).toLowerCase().trim() : '';
+        if (val.includes('customer po')) headerRowIdxJS = rowNumber;
+      });
+      
+      if (headerRowIdxJS !== -1) {
+        row.eachCell((cell, colNumber) => {
+          const val = cell.value ? String(cell.value).toLowerCase().trim() : '';
+          if (val.includes('customer po')) poColIdx = colNumber;
+          if (val.includes('thùng') || val.includes('carton')) cartonColIdx = colNumber;
+          if (val.includes('lon') || val.includes('pcs')) pcsColIdx = colNumber;
+          if (val.includes('pallet')) palletColIdx = colNumber;
+          if (val.includes('kg/car')) weightColIdx = colNumber;
+          if (val.includes('size truck')) truckColIdx = colNumber;
+        });
+      }
+    });
+
+    if (palletColIdx === -1 && headerRowIdxJS !== -1) {
+      palletColIdx = templateSheet.columnCount + 1;
+      const hCell = templateSheet.getCell(headerRowIdxJS, palletColIdx);
+      hCell.value = 'Số lượng Pallet';
+      const adjacentCell = templateSheet.getCell(headerRowIdxJS, palletColIdx - 1);
+      hCell.style = adjacentCell ? adjacentCell.style : {};
+      templateSheet.getColumn(palletColIdx).width = 15;
+    }
+
+    const generatedSheets = [];
 
     // Process each PO from config
     for (const poConfig of config) {
@@ -297,59 +346,86 @@ function execute(obBuffer, goodsSpecBuffer, config) {
         }
       }
 
-      // Generate Sheet for this PO
-      const sheetData = [];
-      // Empty row
-      sheetData.push([]);
-      // Headers
-      const outHeaders = [...headers.slice(0, 15), 'Size Truck'];
-      sheetData.push(outHeaders);
+      // Generate Sheet for this PO using ExcelJS to preserve formatting
+      const newSheet = outWb.addWorksheet(poName);
+      generatedSheets.push(poName);
       
-      // Original lines
-      for (let i = headerRowIdx + 1; i < data.length; i++) {
-        if (data[i] && data[i][poIdx] && data[i][poIdx].toString().trim() === poName) {
-           const row = [...data[i]];
-           const cartons = parseFloat(row[cartonIdx]) || 0;
-           const kg = parseFloat(row[weightIdx]) || 0;
-           row[15] = cartons * kg; // Size Truck column (Weight)
-           sheetData.push(row);
-        }
+      // Clone columns width
+      newSheet.columns = templateSheet.columns.map(c => ({ width: c.width }));
+      if (templateSheet.getColumn(palletColIdx)) {
+         newSheet.getColumn(palletColIdx).width = templateSheet.getColumn(palletColIdx).width || 15;
       }
       
-      sheetData.push([]);
+      // Clone header and rows above
+      for (let r = 1; r <= headerRowIdxJS; r++) {
+        const srcRow = templateSheet.getRow(r);
+        const destRow = newSheet.getRow(r);
+        destRow.height = srcRow.height;
+        srcRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const destCell = destRow.getCell(colNumber);
+          destCell.value = cell.value;
+          destCell.style = cell.style;
+        });
+      }
       
-      // Truck Allocations
+      const styleTemplateRow = templateSheet.getRow(headerRowIdxJS + 1);
+      let currentRow = headerRowIdxJS + 1;
+      
       for (const truck of truckPool) {
         if (truck.items.length === 0) continue;
         
-        sheetData.push([]);
-        sheetData.push(outHeaders);
-        
         for (const item of truck.items) {
-          const row = [...item.row];
-          row[poIdx] = `${poName}_T${truck.id}`; // Append truck ID
-          row[pcsIdx] = item.pcs;
-          row[cartonIdx] = item.cartons;
-          row[15] = item.totalWeight;
-          sheetData.push(row);
+          const destRow = newSheet.getRow(currentRow++);
+          destRow.height = styleTemplateRow.height;
+          
+          styleTemplateRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            const destCell = destRow.getCell(colNumber);
+            destCell.style = cell.style;
+            let val = item.row[colNumber - 1]; // SheetJS 0-indexed array
+            destCell.value = val !== undefined ? val : null;
+          });
+          
+          if (poColIdx !== -1) destRow.getCell(poColIdx).value = `${poName}_T${truck.id}`;
+          if (pcsColIdx !== -1) destRow.getCell(pcsColIdx).value = item.pcs;
+          if (cartonColIdx !== -1) destRow.getCell(cartonColIdx).value = item.cartons;
+          if (weightColIdx !== -1) destRow.getCell(weightColIdx).value = item.weightPerCarton;
+          if (truckColIdx !== -1) destRow.getCell(truckColIdx).value = item.totalWeight;
+          
+          if (palletColIdx !== -1) {
+             const casePallet = spec.items[item.sku] ? spec.items[item.sku].casePallet : 0;
+             const pallets = casePallet ? (item.cartons / casePallet) : 0;
+             const pCell = destRow.getCell(palletColIdx);
+             pCell.value = parseFloat(pallets.toFixed(2));
+             const adjacentStyle = styleTemplateRow.getCell(palletColIdx - 1);
+             pCell.style = adjacentStyle ? adjacentStyle.style : {};
+          }
         }
         
-        // Subtotal row
-        const subtotalRow = new Array(16).fill('');
-        subtotalRow[14] = `XE ${truck.id}`;
-        subtotalRow[15] = truck.currentWeight;
-        sheetData.push(subtotalRow);
+        // Add subtotal row
+        const subtotalRow = newSheet.getRow(currentRow++);
+        const targetLabelCol = truckColIdx !== -1 ? truckColIdx - 1 : 1;
+        const targetValCol = truckColIdx !== -1 ? truckColIdx : 2;
+        
+        subtotalRow.getCell(targetLabelCol).value = `XE ${truck.id}`;
+        subtotalRow.getCell(targetValCol).value = truck.currentWeight;
+        
+        // Bold formatting for subtotal
+        subtotalRow.eachCell(c => c.font = { bold: true });
+        
+        currentRow++; // Empty row separation
       }
-
-      const ws = XLSX.utils.aoa_to_sheet(sheetData);
-      XLSX.utils.book_append_sheet(outWb, ws, poName);
     }
 
-    if (outWb.SheetNames.length === 0) {
+    if (generatedSheets.length === 0) {
       return { success: false, error: 'No POs generated. Ensure trucks were allocated and POs match.' };
     }
 
-    const outputBuffer = XLSX.write(outWb, { type: 'buffer', bookType: 'xlsx' });
+    // Remove the original template sheet so only allocated POs remain
+    if (templateSheet.id) {
+       outWb.removeWorksheet(templateSheet.id);
+    }
+
+    const outputBuffer = await outWb.xlsx.writeBuffer();
     return { success: true, posCount: config.length, outputBuffer };
 
   } catch (error) {

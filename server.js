@@ -369,7 +369,7 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
     const masterData = await storage.downloadAllMasterData();
     const goodsSpecBuffer = masterData.goodsSpecBuffer; // Might be null if missing, that's handled in logic
 
-    const result = truckAllocation.execute(obBuffer, goodsSpecBuffer, config);
+    const result = await truckAllocation.execute(obBuffer, goodsSpecBuffer, config);
     
     if (result.success && result.outputBuffer) {
       const outputFilename = `Truck_Allocation_${Date.now()}.xlsx`;
