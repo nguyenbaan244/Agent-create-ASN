@@ -790,22 +790,36 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
        outWb.removeWorksheet(templateSheet.id);
     }
 
-    // Hide any remaining master data / list address sheets
+    // Collect sheet IDs to hide (don't modify during iteration)
+    const sheetsToHide = [];
     outWb.eachSheet((ws) => {
       const name = ws.name.toUpperCase();
-      if (name.includes('MASTER DATA') || name.includes('LIST ADDRESS')) {
-        ws.state = 'hidden';
+      const isGenerated = generatedSheets.includes(ws.name);
+      if (!isGenerated && (name.includes('MASTER DATA') || name.includes('LIST ADDRESS'))) {
+        sheetsToHide.push(ws.id);
       }
     });
+    
+    // Hide non-result sheets after iteration
+    for (const sheetId of sheetsToHide) {
+      const ws = outWb.getWorksheet(sheetId);
+      if (ws) ws.state = 'hidden';
+    }
 
-    // Set row height to 19 on all generated result sheets
+    // Set row height to 19 and column width to 19 on all generated result sheets
     for (const sheetName of generatedSheets) {
       const ws = outWb.getWorksheet(sheetName);
-      if (ws) {
-        ws.eachRow((row) => {
-          row.height = 19;
-        });
-      }
+      if (!ws) continue;
+      // Ensure it's visible
+      ws.state = 'visible';
+      // Set all column widths to 19
+      ws.columns.forEach((col) => {
+        col.width = 19;
+      });
+      // Set all row heights to 19
+      ws.eachRow((row) => {
+        row.height = 19;
+      });
     }
 
     const outputBuffer = await outWb.xlsx.writeBuffer();
