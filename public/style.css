@@ -723,11 +723,12 @@ tr:hover {
 
 /* Truck Allocation Styles */
 .ta-po-card {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
   transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
 }
 .ta-po-card:hover {
   border-color: var(--primary);
@@ -744,7 +745,7 @@ tr:hover {
 .ta-po-title {
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--primary);
 }
 .ta-po-stats {
   display: flex;
@@ -768,9 +769,9 @@ tr:hover {
   color: var(--text-muted);
 }
 .ta-input-group input, .ta-input-group select {
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--bg-main);
   border: 1px solid var(--border);
-  color: var(--text);
+  color: var(--text-main);
   padding: 8px 12px;
   border-radius: 4px;
   width: 100px;

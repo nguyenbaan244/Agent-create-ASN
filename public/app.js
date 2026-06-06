@@ -642,10 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const batchesOptions = po.batches.map(b => `<option value="${b}">${b}</option>`).join('');
       
       const itemsTable = `
-      <div class="ta-items-table" style="margin-bottom: 16px; overflow-x: auto; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px;">
+      <div class="ta-items-table" style="margin-bottom: 16px; overflow-x: auto; background: var(--bg-main); border: 1px solid var(--border); border-radius: 6px; padding: 8px;">
         <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; color: var(--text-muted);">
           <thead>
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left;">
+            <tr style="border-bottom: 1px solid var(--border); text-align: left;">
               <th style="padding: 8px;">SKU</th>
               <th style="padding: 8px;">Desc</th>
               <th style="padding: 8px;">Batch</th>
@@ -655,8 +655,8 @@ document.addEventListener('DOMContentLoaded', () => {
           </thead>
           <tbody>
             ${po.items.map(item => `
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <td style="padding: 8px; font-weight: 500; color: var(--text);">${item.sku}</td>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px; font-weight: 500; color: var(--text-main);">${item.sku}</td>
                 <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.desc}">${item.desc}</td>
                 <td style="padding: 8px;">${item.batch}</td>
                 <td style="padding: 8px; text-align: right;">${item.cartons.toFixed(2)}</td>
@@ -698,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         ${itemsTable}
         
-        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text);">Allocate Trucks</div>
+        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text-main);">Allocate Trucks</div>
         <div class="ta-truck-inputs" style="margin-bottom: 24px;">
           <div class="ta-input-group">
             <label>2 Tons</label>
@@ -722,7 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         
-        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text);">Set Loading Priorities</div>
+        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text-main);">Set Loading Priorities</div>
         <div style="display: flex; flex-direction: column; gap: 4px;">
           ${priorityRow(1)}
           ${priorityRow(2)}

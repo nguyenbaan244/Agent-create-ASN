@@ -26,24 +26,23 @@ function parseGoodsSpec(buffer) {
 
   const data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 });
   
-  // Find header row
   let headerRowIdx = -1;
   for (let i = 0; i < Math.min(10, data.length); i++) {
-    if (data[i] && data[i].includes('item code')) {
+    if (data[i] && data[i].some(c => c && String(c).toLowerCase().trim() === 'item code')) {
       headerRowIdx = i;
       break;
     }
   }
 
-  if (headerRowIdx === -1) return {};
-  const headers = data[headerRowIdx];
-  const itemCodeIdx = headers.findIndex(h => h && h.toString().toLowerCase() === 'item code');
-  const weightCaseIdx = headers.findIndex(h => h && h.toString().toLowerCase() === 'weight case');
-  const pcsPalletIdx = headers.findIndex(h => h && h.toString().toLowerCase() === 'pcs/pallet');
-  const casePalletIdx = headers.findIndex(h => h && h.toString().toLowerCase() === 'case/pallet');
-  const pcsCaseIdx = headers.findIndex(h => h && h.toString().toLowerCase() === 'pcs/case');
-
   const spec = { items: {}, trucks: {} };
+  if (headerRowIdx === -1) return spec;
+  const headers = data[headerRowIdx];
+  const itemCodeIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'item code');
+  const weightCaseIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'weight case');
+  const pcsPalletIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'pcs/pallet');
+  const casePalletIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'case/pallet');
+  const pcsCaseIdx = headers.findIndex(h => h && h.toString().toLowerCase().trim() === 'pcs/case');
+
   for (let i = headerRowIdx + 1; i < data.length; i++) {
     const row = data[i];
     if (!row || row.length === 0 || !row[itemCodeIdx]) continue;
