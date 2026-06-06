@@ -384,8 +384,9 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         let candidates = truckPool.filter(t => (t.capacity - t.currentWeight) >= weightNeeded);
         
         if (candidates.length > 0) {
-           // Pick truck with most available space
-           candidates.sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
+           // BEST FIT: pick truck with LEAST available space that still fits
+           // This keeps bigger trucks free for larger items later
+           candidates.sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
            const truck = candidates[0];
            truck.items.push({
                ...item,
@@ -398,13 +399,16 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         }
         
         // Must split across trucks — always in full-pallet increments
+        // Pick the truck with LEAST space that can fit at least 1 full pallet
         while (remaining >= casePallet) {
-           truckPool.sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
            
            const palletWeight = casePallet * (item.weightPerCarton || 1);
-           let truck = truckPool.find(t => (t.capacity - t.currentWeight) >= palletWeight);
-           if (!truck) break;
-           
+           // Best fit: pick truck with LEAST space that can still fit 1+ pallet
+           let fitTrucks = truckPool.filter(t => (t.capacity - t.currentWeight) >= palletWeight);
+           if (fitTrucks.length === 0) break;
+           fitTrucks.sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
+           let truck = fitTrucks[0];
+
            const space = truck.capacity - truck.currentWeight;
            const palletsCanFit = Math.floor(space / palletWeight);
            const palletsRemaining = Math.floor(remaining / casePallet);
