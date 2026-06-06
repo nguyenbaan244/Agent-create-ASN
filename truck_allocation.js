@@ -660,12 +660,12 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
         }
       }
       
-      // === Rebalance: Move small items from heavy trucks to lighter trucks ===
-      // Goal: reduce pick lines on each truck
+      // === Rebalance: Move small items from heavy trucks to lighter/smaller trucks ===
+      // Goal: reduce pick lines on heavy trucks, utilize smaller trucks
       for (const truck of truckPool) {
         if (truck.items.length <= 1) continue;
         
-        // Check each item — if it's small (< 1 full pallet), see if another truck can take it
+        // Check each item — if it's small (< 1 full pallet), try to move elsewhere
         const itemsToMove = [];
         for (let i = truck.items.length - 1; i >= 0; i--) {
           const item = truck.items[i];
@@ -676,15 +676,25 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
           // Only consider moving items that are less than 1 full pallet
           if (pallets >= 1) continue;
           
-          // Find another truck that has space and can accept this SKU
-          const otherTruck = truckPool.find(t => 
-            t.id !== truck.id && 
-            canAssignToTruck(item.sku, t.id) &&
-            (t.capacity - t.currentWeight) >= item.totalWeight
-          );
+          // Find the LIGHTEST truck that has space and can accept this SKU
+          // Prefer: 1) truck that already has this SKU, 2) truck with least load
+          const candidates = truckPool
+            .filter(t => 
+              t.id !== truck.id && 
+              canAssignToTruck(item.sku, t.id) &&
+              (t.capacity - t.currentWeight) >= item.totalWeight
+            )
+            .sort((a, b) => {
+              // Prefer truck that already has same SKU (consolidation)
+              const aHasSku = a.items.some(i => i.sku === item.sku) ? 0 : 1;
+              const bHasSku = b.items.some(i => i.sku === item.sku) ? 0 : 1;
+              if (aHasSku !== bHasSku) return aHasSku - bHasSku;
+              // Then prefer lightest truck (fill smaller trucks first)
+              return a.currentWeight - b.currentWeight;
+            });
           
-          if (otherTruck) {
-            itemsToMove.push({ index: i, targetTruck: otherTruck });
+          if (candidates.length > 0) {
+            itemsToMove.push({ index: i, targetTruck: candidates[0] });
           }
         }
         
