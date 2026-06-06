@@ -796,7 +796,13 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
           }
           if (fitTrucks.length === 0) break;
           
-          fitTrucks.sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
+          // Prefer truck that already has same SKU (merge = fewer pick lines), then best-fit
+          fitTrucks.sort((a, b) => {
+            const aHas = a.items.some(i => i.sku === item.sku) ? 0 : 1;
+            const bHas = b.items.some(i => i.sku === item.sku) ? 0 : 1;
+            if (aHas !== bHas) return aHas - bHas;
+            return (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight);
+          });
           const truck = fitTrucks[0];
           
           const palletsCanFit = Math.floor((truck.capacity - truck.currentWeight) / palletWt);
@@ -834,7 +840,13 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
         }
         if (fitTrucks.length === 0) continue;
         
-        fitTrucks.sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
+        // Prefer truck that already has same SKU (merge = fewer pick lines), then best-fit
+        fitTrucks.sort((a, b) => {
+          const aHas = a.items.some(i => i.sku === item.sku) ? 0 : 1;
+          const bHas = b.items.some(i => i.sku === item.sku) ? 0 : 1;
+          if (aHas !== bHas) return aHas - bHas;
+          return (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight);
+        });
         const truck = fitTrucks[0];
         
         const cartonsToLoad = Math.min(item.remainCartons, Math.floor((truck.capacity - truck.currentWeight) / (item.weightPerCarton || 1)));
