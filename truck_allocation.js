@@ -43,19 +43,58 @@ function parseGoodsSpec(buffer) {
   const casePalletIdx = headers.findIndex(h => h && h.toString().toLowerCase() === 'case/pallet');
   const pcsCaseIdx = headers.findIndex(h => h && h.toString().toLowerCase() === 'pcs/case');
 
-  const spec = {};
+  const spec = { items: {}, trucks: {} };
   for (let i = headerRowIdx + 1; i < data.length; i++) {
     const row = data[i];
     if (!row || row.length === 0 || !row[itemCodeIdx]) continue;
     
+    // Stop if we hit the truck master data section
+    if (row.some(c => c && String(c).toLowerCase().includes('master data of truck'))) break;
+    
     const code = row[itemCodeIdx].toString().trim();
-    spec[code] = {
+    spec.items[code] = {
       weightCase: parseFloat(row[weightCaseIdx]) || 0,
       pcsPallet: parseFloat(row[pcsPalletIdx]) || 0,
       casePallet: parseFloat(row[casePalletIdx]) || 0,
       pcsCase: parseFloat(row[pcsCaseIdx]) || 1
     };
   }
+
+  // Parse Trucks
+  let truckHeaderIdx = -1;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] && data[i].includes('Type Truck')) {
+      truckHeaderIdx = i;
+      break;
+    }
+  }
+
+  if (truckHeaderIdx !== -1) {
+    const tHeaders = data[truckHeaderIdx];
+    const typeIdx = tHeaders.findIndex(h => h && h.toString().trim() === 'Type Truck');
+    const loadIdx = tHeaders.findIndex(h => h && h.toString().trim() === 'Max load (Kg)');
+    const cbmIdx = tHeaders.findIndex(h => h && h.toString().trim() === 'CBM');
+    
+    for (let i = truckHeaderIdx + 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row || !row[typeIdx]) continue;
+      const typeStr = row[typeIdx].toString().toLowerCase();
+      let key = '';
+      if (typeStr.includes('2')) key = '2T';
+      else if (typeStr.includes('5')) key = '5T';
+      else if (typeStr.includes('8')) key = '8T';
+      else if (typeStr.includes('15')) key = '15T';
+      else if (typeStr.includes('40')) key = 'Cont40';
+      
+      if (key) {
+        spec.trucks[key] = {
+          maxLoad: parseFloat(row[loadIdx]) || TRUCK_CAPACITY[key],
+          cbm: parseFloat(row[cbmIdx]) || TRUCK_CBM[key]
+        };
+      }
+    }
+  }
+
   return spec;
 }
 
@@ -177,7 +216,8 @@ function execute(obBuffer, goodsSpecBuffer, config) {
           const batch = row[batchIdx] ? row[batchIdx].toString().trim() : '';
           const pcs = parseFloat(row[pcsIdx]) || 0;
           const cartons = parseFloat(row[cartonIdx]) || 0;
-          const weightPerCarton = parseFloat(row[weightIdx]) || (spec[sku] ? spec[sku].weightCase : 0);
+          const itemSpec = spec.items[sku] || {};
+          const weightPerCarton = parseFloat(row[weightIdx]) || itemSpec.weightCase || 0;
           const totalWeight = cartons * weightPerCarton;
           
           let priorityScore = 0;
@@ -203,7 +243,8 @@ function execute(obBuffer, goodsSpecBuffer, config) {
       const truckPool = [];
       let truckIdCounter = 1;
       for (const [type, count] of Object.entries(trucks)) {
-        const cap = TRUCK_CAPACITY[type];
+        const truckSpec = spec.trucks[type] || { maxLoad: TRUCK_CAPACITY[type] };
+        const cap = truckSpec.maxLoad;
         for (let i = 0; i < count; i++) {
           truckPool.push({ id: truckIdCounter++, type, capacity: cap, currentWeight: 0, items: [] });
         }
@@ -222,20 +263,21 @@ function execute(obBuffer, goodsSpecBuffer, config) {
           const availableWeight = truck.capacity - truck.currentWeight;
           const maxCartonsCanFit = availableWeight / (line.weightPerCarton || 1);
           
-          let cartonsToLoad = Math.min(remainingCartons, maxCartonsCanFit);
+          let cartonsToLoad = Math.floor(maxCartonsCanFit); // Must be whole cartons
+          cartonsToLoad = Math.min(remainingCartons, cartonsToLoad);
           
           // Pallet rounding logic
-          const skuSpec = spec[line.sku];
+          const skuSpec = spec.items[line.sku];
           if (skuSpec && skuSpec.casePallet && cartonsToLoad < remainingCartons) {
             // We need to split. Try to snap to full pallets
             const fullPalletsCanFit = Math.floor(cartonsToLoad / skuSpec.casePallet);
             if (fullPalletsCanFit > 0) {
               cartonsToLoad = fullPalletsCanFit * skuSpec.casePallet;
             }
-            // If even 1 full pallet doesn't fit, just load what we can (odd pallet)
+            // If even 1 full pallet doesn't fit, just load what we can (odd cartons, but guaranteed integer)
           }
 
-          const pcsToLoad = (cartonsToLoad / line.cartons) * line.pcs;
+          const pcsToLoad = Math.round((cartonsToLoad / line.cartons) * line.pcs);
           const weightToLoad = cartonsToLoad * line.weightPerCarton;
 
           if (cartonsToLoad > 0) {
