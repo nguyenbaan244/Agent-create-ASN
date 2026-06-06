@@ -1089,23 +1089,20 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
       }
     });
     
-    // Hide non-result sheets after iteration
-    for (const sheetId of sheetsToHide) {
-      const ws = outWb.getWorksheet(sheetId);
-      if (ws) ws.state = 'hidden';
+    // Only hide if we have at least 1 visible generated sheet
+    if (generatedSheets.length > 0) {
+      for (const sheetId of sheetsToHide) {
+        const ws = outWb.getWorksheet(sheetId);
+        if (ws) ws.state = 'veryHidden';
+      }
     }
 
-    // Set row height to 19 and column width to 19 on all generated result sheets
+    // Set row height to 19 on all generated result sheets
     for (const sheetName of generatedSheets) {
       const ws = outWb.getWorksheet(sheetName);
       if (!ws) continue;
       // Ensure it's visible
       ws.state = 'visible';
-      // Set all column widths to 19 (use columnCount or fallback to 20)
-      const colCount = ws.columnCount || 20;
-      for (let c = 1; c <= colCount; c++) {
-        ws.getColumn(c).width = 19;
-      }
       // Set all row heights to 19
       ws.eachRow({ includeEmpty: false }, (row) => {
         row.height = 19;
