@@ -767,6 +767,22 @@ document.addEventListener('DOMContentLoaded', () => {
           </tr>`;
         }).join('');
         
+        // Compute totals for this truck
+        const tPcs = truck.items.reduce((s, i) => s + i.pcs, 0);
+        const tCartons = truck.items.reduce((s, i) => s + i.cartons, 0);
+        const tWeight = truck.items.reduce((s, i) => s + i.weight, 0);
+        const tPallets = truck.items.reduce((s, i) => s + i.pallets, 0);
+        const tCbm = truck.items.reduce((s, i) => s + (i.cbm || 0), 0);
+        
+        const totalRowHtml = `<tr class="ta-total-row">
+          <td colspan="3" style="font-weight:700; color:var(--primary);">Total XE ${truck.id}</td>
+          <td class="num">${tPcs.toLocaleString()}</td>
+          <td class="num">${tCartons.toLocaleString()}</td>
+          <td class="num">${tWeight.toLocaleString()}</td>
+          <td class="num">${tPallets.toFixed(2)}</td>
+          <td class="num">${tCbm > 0 ? tCbm.toFixed(3) : '-'}</td>
+        </tr>`;
+        
         return `
         <div class="ta-result-truck">
           <div class="ta-result-truck-header">
@@ -791,6 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <th style="text-align:right">CBM</th>
             </tr></thead>
             <tbody>${itemsHtml}</tbody>
+            <tfoot>${totalRowHtml}</tfoot>
           </table>
         </div>`;
       }).join('');

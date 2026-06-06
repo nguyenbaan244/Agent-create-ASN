@@ -918,6 +918,14 @@ tr:hover {
   font-weight: 600;
   color: var(--primary);
 }
+.ta-total-row td {
+  font-weight: 700 !important;
+  background: #f0f4ff;
+  border-top: 2px solid var(--primary);
+  border-bottom: none;
+  padding: 10px 12px;
+  font-variant-numeric: tabular-nums;
+}
 .pallet-chip {
   display: inline-block;
   padding: 2px 8px;
