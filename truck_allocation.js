@@ -812,12 +812,13 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
       if (!ws) continue;
       // Ensure it's visible
       ws.state = 'visible';
-      // Set all column widths to 19
-      ws.columns.forEach((col) => {
-        col.width = 19;
-      });
+      // Set all column widths to 19 (use columnCount or fallback to 20)
+      const colCount = ws.columnCount || 20;
+      for (let c = 1; c <= colCount; c++) {
+        ws.getColumn(c).width = 19;
+      }
       // Set all row heights to 19
-      ws.eachRow((row) => {
+      ws.eachRow({ includeEmpty: false }, (row) => {
         row.height = 19;
       });
     }
