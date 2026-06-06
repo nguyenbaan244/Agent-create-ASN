@@ -372,11 +372,13 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
     const result = await truckAllocation.execute(obBuffer, goodsSpecBuffer, config, version || 'v1');
     
     if (result.success && result.outputBuffer) {
-      const now = new Date();
-      const dd = String(now.getDate()).padStart(2, '0');
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const yyyy = now.getFullYear();
-      const outputFilename = `Truck allocation ${dd}.${mm}.${yyyy}.xlsx`;
+      // Extract date from OB Request filename (e.g. "03. Total OB request - 05.06.2026.xlsx")
+      const dateMatch = filename.match(/(\d{2}\.\d{2}\.\d{4})\.xlsx$/i);
+      const dateStr = dateMatch ? dateMatch[1] : (() => {
+        const now = new Date();
+        return `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`;
+      })();
+      const outputFilename = `Truck Allocation ${dateStr}.xlsx`;
       await storage.uploadFile('output/truck-allocation', outputFilename, result.outputBuffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       delete result.outputBuffer;
       result.outputFile = outputFilename;
