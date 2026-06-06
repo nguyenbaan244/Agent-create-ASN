@@ -156,15 +156,15 @@ function preview(obBuffer) {
       posMap[poName].totalCartons += cartons;
       posMap[poName].totalWeight += itemWeight;
 
-      // Aggregate items for UI display
-      const existingItem = posMap[poName].items.find(i => i.sku === skuStr && i.batch === batchStr);
-      if (existingItem) {
-         existingItem.cartons += cartons;
-         existingItem.weight += itemWeight;
-      } else {
-         posMap[poName].items.push({ sku: skuStr, desc: descStr, batch: batchStr, cartons, weight: itemWeight });
+      // Keep each original row as-is (no aggregation)
+      const rowData = {};
+      for (let c = 0; c < headers.length; c++) {
+        if (headers[c]) rowData[headers[c].toString().trim()] = row[c] !== undefined ? row[c] : '';
       }
+      posMap[poName].items.push(rowData);
     }
+
+    const headersList = headers.filter(h => h).map(h => h.toString().trim());
 
     const pos = Object.values(posMap).map(p => ({
       ...p,
@@ -172,7 +172,7 @@ function preview(obBuffer) {
       batches: Array.from(p.batches)
     }));
 
-    return { success: true, pos };
+    return { success: true, pos, headers: headersList };
   } catch (error) {
     return { success: false, error: error.message };
   }

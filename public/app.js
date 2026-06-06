@@ -585,6 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnRefreshTa = document.getElementById('btn-refresh-ta');
   
   let taPOs = [];
+  let taHeaders = [];
   let taFilenameOnServer = '';
 
   if (btnRefreshTa) {
@@ -622,6 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.success) {
           taPOs = data.pos;
           taFilenameOnServer = data.filename;
+          taHeaders = data.headers || [];
           renderTaPOs();
           taPoContainer.classList.remove('hidden');
           taActions.classList.remove('hidden');
@@ -641,26 +643,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const skusOptions = po.skus.map(sku => `<option value="${sku}">${sku}</option>`).join('');
       const batchesOptions = po.batches.map(b => `<option value="${b}">${b}</option>`).join('');
       
+      const thStyle = `padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: #fff; background: linear-gradient(135deg, #4361ee, #5b6abf); white-space: nowrap;`;
+      const numCols = ['Carton', 'Kg', 'PCS', 'Pcs', 'Weight', 'pcs'];
+      
       const itemsTable = `
-      <div class="ta-items-table" style="margin-bottom: 16px; overflow-x: auto; background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 8px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.83rem; color: var(--text-muted);">
+      <div class="ta-items-table" style="margin-bottom: 16px; overflow-x: auto; background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.83rem;">
           <thead>
-            <tr style="border-bottom: 1px solid var(--border); text-align: left;">
-              <th style="padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">SKU</th>
-              <th style="padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Desc</th>
-              <th style="padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Batch</th>
-              <th style="padding: 8px; text-align: right; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Cartons</th>
-              <th style="padding: 8px; text-align: right; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Weight (Kg)</th>
+            <tr>
+              ${taHeaders.map(h => {
+                const isNum = numCols.some(n => h.includes(n));
+                return `<th style="${thStyle}${isNum ? ' text-align: right;' : ''}">${h}</th>`;
+              }).join('')}
             </tr>
           </thead>
           <tbody>
             ${po.items.map(item => `
               <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px; font-weight: 600; color: var(--primary);">${item.sku}</td>
-                <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main);" title="${item.desc}">${item.desc}</td>
-                <td style="padding: 8px; color: var(--text-main);">${item.batch}</td>
-                <td style="padding: 8px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main);">${item.cartons.toFixed(0)}</td>
-                <td style="padding: 8px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main);">${item.weight.toFixed(2)}</td>
+                ${taHeaders.map(h => {
+                  const val = item[h] !== undefined ? item[h] : '';
+                  const isNum = numCols.some(n => h.includes(n));
+                  const isSku = h === 'SAP Code';
+                  const style = `padding: 8px; color: var(--text-main);${isNum ? ' text-align: right; font-variant-numeric: tabular-nums;' : ''}${isSku ? ' font-weight: 600; color: var(--primary);' : ''}`;
+                  const display = typeof val === 'number' ? (isNum ? val.toLocaleString() : val) : val;
+                  return `<td style="${style}">${display}</td>`;
+                }).join('')}
               </tr>
             `).join('')}
           </tbody>
