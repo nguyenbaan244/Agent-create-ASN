@@ -338,8 +338,9 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
       for (const [type, count] of Object.entries(trucks)) {
         const truckSpec = spec.trucks[type] || { maxLoad: TRUCK_CAPACITY[type] };
         const cap = truckSpec.maxLoad;
+        const cbmCap = (truckSpec.cbm) || TRUCK_CBM[type] || 0;
         for (let i = 0; i < count; i++) {
-          truckPool.push({ id: truckIdCounter++, type, capacity: cap, currentWeight: 0, items: [] });
+          truckPool.push({ id: truckIdCounter++, type, capacity: cap, cbmCapacity: cbmCap, currentWeight: 0, items: [] });
         }
       }
 
@@ -545,12 +546,22 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
       // Build allocation summary for frontend display
       const poSummary = {
         poName,
-        trucks: truckPool.filter(t => t.items.length > 0).map(t => ({
+        trucks: truckPool.filter(t => t.items.length > 0).map(t => {
+          // Calculate total CBM for this truck
+          const truckCbm = t.items.reduce((sum, item) => {
+            const cbmCase = spec.items[item.sku] ? spec.items[item.sku].cbmCase : 0;
+            return sum + (cbmCase ? item.cartons * cbmCase : 0);
+          }, 0);
+          
+          return {
           id: t.id,
           type: t.type,
           capacity: t.capacity,
+          cbmCapacity: t.cbmCapacity,
           currentWeight: Math.round(t.currentWeight * 100) / 100,
+          currentCbm: Math.round(truckCbm * 1000) / 1000,
           utilization: Math.round((t.currentWeight / t.capacity) * 100),
+          cbmUtilization: t.cbmCapacity ? Math.round((truckCbm / t.cbmCapacity) * 100) : 0,
           items: t.items.map(item => {
             const casePallet = spec.items[item.sku] ? spec.items[item.sku].casePallet : 0;
             const pallets = casePallet ? Math.round((item.cartons / casePallet) * 100) / 100 : 0;
@@ -568,7 +579,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
               cbm
             };
           })
-        }))
+        };})
       };
       allocationSummary.push(poSummary);
 

@@ -811,10 +811,14 @@ document.addEventListener('DOMContentLoaded', () => {
               <span style="margin-left: 8px; font-size: 0.82rem; color: var(--text-muted);">${truck.type}</span>
             </div>
             <div class="ta-truck-meta">
-              <span><span class="weight-val">${(truck.currentWeight / 1000).toFixed(2)}</span> / ${(truck.capacity / 1000).toFixed(0)}T</span>
-              <span>${util}%
+              <span><i class="fa-solid fa-weight-hanging" style="margin-right:4px; font-size:0.7rem;"></i><span class="weight-val">${(truck.currentWeight / 1000).toFixed(2)}</span> / ${(truck.capacity / 1000).toFixed(0)}T = ${util}%
                 <span class="ta-utilization-bar">
                   <span class="ta-utilization-fill" style="width:${util}%; background:${barColor};"></span>
+                </span>
+              </span>
+              <span><i class="fa-solid fa-cube" style="margin-right:4px; font-size:0.7rem;"></i><span class="weight-val">${truck.currentCbm.toFixed(1)}</span> / ${truck.cbmCapacity} = ${truck.cbmUtilization}%
+                <span class="ta-utilization-bar">
+                  <span class="ta-utilization-fill" style="width:${Math.min(truck.cbmUtilization, 100)}%; background:${truck.cbmUtilization > 90 ? '#ef4444' : truck.cbmUtilization > 70 ? '#f59e0b' : '#10b981'};"></span>
                 </span>
               </span>
             </div>
