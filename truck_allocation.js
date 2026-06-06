@@ -211,6 +211,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
     const outWb = new ExcelJS.Workbook();
     await outWb.xlsx.load(obBuffer);
     const templateSheet = outWb.worksheets[0];
+    templateSheet.name = `Template_Temp_${Date.now()}`;
     
     let headerRowIdxJS = -1;
     let palletColIdx = -1;
