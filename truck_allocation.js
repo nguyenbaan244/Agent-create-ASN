@@ -81,6 +81,7 @@ function preview(obBuffer) {
     const batchIdx = headers.findIndex(h => h && h.toString().includes('Batch'));
     const cartonIdx = headers.findIndex(h => h && h.toString().includes('Carton'));
     const weightIdx = headers.findIndex(h => h && h.toString().includes('Kg/Car'));
+    const descIdx = headers.findIndex(h => h && h.toString().trim() === 'Desc');
 
     const posMap = {};
 
@@ -89,23 +90,40 @@ function preview(obBuffer) {
       if (!row || !row[poIdx]) continue;
 
       const poName = row[poIdx].toString().trim();
+      if (!poName || poName.toLowerCase() === 'customer po') continue;
+
       if (!posMap[poName]) {
         posMap[poName] = {
           poName,
           skus: new Set(),
           batches: new Set(),
           totalCartons: 0,
-          totalWeight: 0
+          totalWeight: 0,
+          items: []
         };
       }
 
-      if (skuIdx !== -1 && row[skuIdx]) posMap[poName].skus.add(row[skuIdx].toString().trim());
-      if (batchIdx !== -1 && row[batchIdx]) posMap[poName].batches.add(row[batchIdx].toString().trim());
+      const skuStr = skuIdx !== -1 && row[skuIdx] ? row[skuIdx].toString().trim() : '';
+      const batchStr = batchIdx !== -1 && row[batchIdx] ? row[batchIdx].toString().trim() : '';
+      const descStr = descIdx !== -1 && row[descIdx] ? row[descIdx].toString().trim() : '';
+
+      if (skuStr) posMap[poName].skus.add(skuStr);
+      if (batchStr) posMap[poName].batches.add(batchStr);
       
       const cartons = parseFloat(row[cartonIdx]) || 0;
       const weightPerCarton = parseFloat(row[weightIdx]) || 0;
+      const itemWeight = cartons * weightPerCarton;
       posMap[poName].totalCartons += cartons;
-      posMap[poName].totalWeight += (cartons * weightPerCarton);
+      posMap[poName].totalWeight += itemWeight;
+
+      // Aggregate items for UI display
+      const existingItem = posMap[poName].items.find(i => i.sku === skuStr && i.batch === batchStr);
+      if (existingItem) {
+         existingItem.cartons += cartons;
+         existingItem.weight += itemWeight;
+      } else {
+         posMap[poName].items.push({ sku: skuStr, desc: descStr, batch: batchStr, cartons, weight: itemWeight });
+      }
     }
 
     const pos = Object.values(posMap).map(p => ({
@@ -148,7 +166,7 @@ function execute(obBuffer, goodsSpecBuffer, config) {
 
     // Process each PO from config
     for (const poConfig of config) {
-      const { poName, trucks, prioritySku, priorityBatch } = poConfig;
+      const { poName, trucks, priorities } = poConfig;
       
       // Filter lines for this PO
       let lines = [];
@@ -163,8 +181,16 @@ function execute(obBuffer, goodsSpecBuffer, config) {
           const totalWeight = cartons * weightPerCarton;
           
           let priorityScore = 0;
-          if (prioritySku && sku === prioritySku) priorityScore += 10;
-          if (priorityBatch && batch === priorityBatch) priorityScore += 10;
+          if (priorities && priorities.length > 0) {
+            if (priorities[0] && priorities[0].sku && sku === priorities[0].sku) priorityScore += 30;
+            if (priorities[0] && priorities[0].batch && batch === priorities[0].batch) priorityScore += 30;
+            
+            if (priorities[1] && priorities[1].sku && sku === priorities[1].sku) priorityScore += 20;
+            if (priorities[1] && priorities[1].batch && batch === priorities[1].batch) priorityScore += 20;
+            
+            if (priorities[2] && priorities[2].sku && sku === priorities[2].sku) priorityScore += 10;
+            if (priorities[2] && priorities[2].batch && batch === priorities[2].batch) priorityScore += 10;
+          }
           
           lines.push({ row, sku, batch, pcs, cartons, weightPerCarton, totalWeight, priorityScore });
         }

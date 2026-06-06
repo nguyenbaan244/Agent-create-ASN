@@ -641,6 +641,51 @@ document.addEventListener('DOMContentLoaded', () => {
       const skusOptions = po.skus.map(sku => `<option value="${sku}">${sku}</option>`).join('');
       const batchesOptions = po.batches.map(b => `<option value="${b}">${b}</option>`).join('');
       
+      const itemsTable = `
+      <div class="ta-items-table" style="margin-bottom: 16px; overflow-x: auto; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; color: var(--text-muted);">
+          <thead>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: left;">
+              <th style="padding: 8px;">SKU</th>
+              <th style="padding: 8px;">Desc</th>
+              <th style="padding: 8px;">Batch</th>
+              <th style="padding: 8px; text-align: right;">Cartons</th>
+              <th style="padding: 8px; text-align: right;">Weight (Kg)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${po.items.map(item => `
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 8px; font-weight: 500; color: var(--text);">${item.sku}</td>
+                <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.desc}">${item.desc}</td>
+                <td style="padding: 8px;">${item.batch}</td>
+                <td style="padding: 8px; text-align: right;">${item.cartons.toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right;">${item.weight.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      `;
+
+      const priorityRow = (level) => `
+        <div class="ta-truck-inputs priority-row" data-level="${level}" style="margin-bottom: 12px; align-items: center;">
+          <div style="width: 70px; font-size: 0.85rem; color: var(--text-muted);">Priority ${level}</div>
+          <div class="ta-input-group">
+            <select class="priority-sku">
+              <option value="">-- SKU --</option>
+              ${skusOptions}
+            </select>
+          </div>
+          <div class="ta-input-group">
+            <select class="priority-batch">
+              <option value="">-- Batch --</option>
+              ${batchesOptions}
+            </select>
+          </div>
+        </div>
+      `;
+
       return `
       <div class="ta-po-card" data-index="${index}">
         <div class="ta-po-header">
@@ -651,8 +696,10 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         
+        ${itemsTable}
+        
         <div style="margin-bottom: 12px; font-weight: 600; color: var(--text);">Allocate Trucks</div>
-        <div class="ta-truck-inputs">
+        <div class="ta-truck-inputs" style="margin-bottom: 24px;">
           <div class="ta-input-group">
             <label>2 Tons</label>
             <input type="number" min="0" value="0" class="truck-input" data-type="2T">
@@ -675,22 +722,11 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         
-        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text);">Priorities (Top 1)</div>
-        <div class="ta-truck-inputs">
-          <div class="ta-input-group">
-            <label>Priority SKU</label>
-            <select class="priority-sku">
-              <option value="">-- None --</option>
-              ${skusOptions}
-            </select>
-          </div>
-          <div class="ta-input-group">
-            <label>Priority Batch</label>
-            <select class="priority-batch">
-              <option value="">-- None --</option>
-              ${batchesOptions}
-            </select>
-          </div>
+        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text);">Set Loading Priorities</div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          ${priorityRow(1)}
+          ${priorityRow(2)}
+          ${priorityRow(3)}
         </div>
       </div>
       `;
@@ -710,10 +746,16 @@ document.addEventListener('DOMContentLoaded', () => {
             trucks[inp.getAttribute('data-type')] = parseInt(inp.value);
           }
         });
-        const prioritySku = card.querySelector('.priority-sku').value;
-        const priorityBatch = card.querySelector('.priority-batch').value;
+        const priorities = [];
+        card.querySelectorAll('.priority-row').forEach(pRow => {
+           const sku = pRow.querySelector('.priority-sku').value;
+           const batch = pRow.querySelector('.priority-batch').value;
+           if (sku || batch) {
+             priorities.push({sku, batch});
+           }
+        });
         
-        config.push({ poName, trucks, prioritySku, priorityBatch });
+        config.push({ poName, trucks, priorities });
       });
       
       loadingModal.classList.add('active');
