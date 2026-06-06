@@ -274,6 +274,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
     }
 
     const generatedSheets = [];
+    const allocationSummary = [];
 
     // Process each PO from config
     for (const poConfig of config) {
@@ -483,8 +484,31 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         truck.currentWeight += weightToLoad;
       }
       
-      // Sort truckPool back by ID to preserve display order in the Excel sheet
-      truckPool.sort((a, b) => a.id - b.id);
+      // Build allocation summary for frontend display
+      const poSummary = {
+        poName,
+        trucks: truckPool.filter(t => t.items.length > 0).map(t => ({
+          id: t.id,
+          type: t.type,
+          capacity: t.capacity,
+          currentWeight: Math.round(t.currentWeight * 100) / 100,
+          utilization: Math.round((t.currentWeight / t.capacity) * 100),
+          items: t.items.map(item => {
+            const casePallet = spec.items[item.sku] ? spec.items[item.sku].casePallet : 0;
+            const pallets = casePallet ? Math.round((item.cartons / casePallet) * 100) / 100 : 0;
+            return {
+              sku: item.sku,
+              desc: item.row[skuIdx + 1] || '',
+              batch: item.batch,
+              cartons: item.cartons,
+              pcs: item.pcs,
+              weight: Math.round(item.totalWeight * 100) / 100,
+              pallets
+            };
+          })
+        }))
+      };
+      allocationSummary.push(poSummary);
 
       // Remove existing sheet with the same name if it exists in the original workbook
       const existingSheet = outWb.getWorksheet(poName);
@@ -645,7 +669,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
     }
 
     const outputBuffer = await outWb.xlsx.writeBuffer();
-    return { success: true, posCount: config.length, outputBuffer };
+    return { success: true, posCount: config.length, outputBuffer, allocationSummary };
 
   } catch (error) {
     return { success: false, error: error.message };

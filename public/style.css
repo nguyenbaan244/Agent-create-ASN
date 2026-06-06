@@ -725,33 +725,39 @@ tr:hover {
 .ta-po-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: 12px;
+  padding: 20px;
   transition: all 0.3s ease;
   box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--primary);
 }
 .ta-po-card:hover {
   border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 4px 16px rgba(67, 97, 238, 0.12);
 }
 .ta-po-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 12px;
+  background: linear-gradient(135deg, #4361ee10, #7c3aed10);
+  padding: 12px 16px;
+  border-radius: 8px;
 }
 .ta-po-title {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: var(--primary);
+  letter-spacing: -0.01em;
 }
 .ta-po-stats {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   font-size: 0.9rem;
   color: var(--text-muted);
+}
+.ta-po-stats span strong {
+  color: var(--text-main);
 }
 .ta-truck-inputs {
   display: flex;
@@ -765,17 +771,166 @@ tr:hover {
   gap: 6px;
 }
 .ta-input-group label {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .ta-input-group input, .ta-input-group select {
   background: var(--bg-main);
   border: 1px solid var(--border);
   color: var(--text-main);
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   width: 100px;
+  transition: border-color 0.2s;
+}
+.ta-input-group input:focus, .ta-input-group select:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
 }
 .ta-input-group select {
   width: 180px;
 }
+.ta-section-label {
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ta-section-label i {
+  color: var(--primary);
+  font-size: 0.85rem;
+}
+
+/* Allocation Result Styles */
+.ta-result-po {
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.ta-result-po-header {
+  background: linear-gradient(135deg, #4361ee, #7c3aed);
+  color: #fff;
+  padding: 14px 20px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ta-result-po-header .po-badge {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  font-weight: 400;
+  opacity: 0.9;
+}
+.ta-result-truck {
+  border-bottom: 1px solid var(--border);
+}
+.ta-result-truck:last-child {
+  border-bottom: none;
+}
+.ta-result-truck-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: #f1f5f9;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-main);
+  cursor: default;
+}
+.ta-truck-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--primary);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.ta-truck-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.ta-truck-meta .weight-val {
+  font-weight: 700;
+  color: var(--text-main);
+}
+.ta-utilization-bar {
+  width: 80px;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+.ta-utilization-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.ta-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+.ta-result-table thead th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--border);
+}
+.ta-result-table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--text-main);
+}
+.ta-result-table tbody tr:hover {
+  background: #f8fafc;
+}
+.ta-result-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ta-result-table .sku-cell {
+  font-weight: 600;
+  color: var(--primary);
+}
+.pallet-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.pallet-chip.full {
+  background: #dcfce7;
+  color: #166534;
+}
+.pallet-chip.partial {
+  background: #fef9c3;
+  color: #854d0e;
+}
+

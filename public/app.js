@@ -642,25 +642,25 @@ document.addEventListener('DOMContentLoaded', () => {
       const batchesOptions = po.batches.map(b => `<option value="${b}">${b}</option>`).join('');
       
       const itemsTable = `
-      <div class="ta-items-table" style="margin-bottom: 16px; overflow-x: auto; background: var(--bg-main); border: 1px solid var(--border); border-radius: 6px; padding: 8px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; color: var(--text-muted);">
+      <div class="ta-items-table" style="margin-bottom: 16px; overflow-x: auto; background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.83rem; color: var(--text-muted);">
           <thead>
             <tr style="border-bottom: 1px solid var(--border); text-align: left;">
-              <th style="padding: 8px;">SKU</th>
-              <th style="padding: 8px;">Desc</th>
-              <th style="padding: 8px;">Batch</th>
-              <th style="padding: 8px; text-align: right;">Cartons</th>
-              <th style="padding: 8px; text-align: right;">Weight (Kg)</th>
+              <th style="padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">SKU</th>
+              <th style="padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Desc</th>
+              <th style="padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Batch</th>
+              <th style="padding: 8px; text-align: right; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Cartons</th>
+              <th style="padding: 8px; text-align: right; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Weight (Kg)</th>
             </tr>
           </thead>
           <tbody>
             ${po.items.map(item => `
-              <tr style="border-bottom: 1px solid var(--border);">
-                <td style="padding: 8px; font-weight: 500; color: var(--text-main);">${item.sku}</td>
-                <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.desc}">${item.desc}</td>
-                <td style="padding: 8px;">${item.batch}</td>
-                <td style="padding: 8px; text-align: right;">${item.cartons.toFixed(2)}</td>
-                <td style="padding: 8px; text-align: right;">${item.weight.toFixed(2)}</td>
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px; font-weight: 600; color: var(--primary);">${item.sku}</td>
+                <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main);" title="${item.desc}">${item.desc}</td>
+                <td style="padding: 8px; color: var(--text-main);">${item.batch}</td>
+                <td style="padding: 8px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main);">${item.cartons.toFixed(0)}</td>
+                <td style="padding: 8px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main);">${item.weight.toFixed(2)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -689,16 +689,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return `
       <div class="ta-po-card" data-index="${index}">
         <div class="ta-po-header">
-          <div class="ta-po-title">PO: ${po.poName}</div>
+          <div class="ta-po-title"><i class="fa-solid fa-box-open" style="margin-right: 6px;"></i> PO: ${po.poName}</div>
           <div class="ta-po-stats">
-            <span><strong>${po.totalCartons.toFixed(2)}</strong> Cartons</span>
-            <span><strong>${po.totalWeight.toFixed(2)}</strong> Kg</span>
+            <span><strong>${po.totalCartons.toFixed(0)}</strong> Cartons</span>
+            <span><strong>${(po.totalWeight / 1000).toFixed(2)}</strong> Tons</span>
           </div>
         </div>
         
         ${itemsTable}
         
-        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text-main);">Allocate Trucks</div>
+        <div class="ta-section-label"><i class="fa-solid fa-truck-loading"></i> Allocate Trucks</div>
         <div class="ta-truck-inputs" style="margin-bottom: 24px;">
           <div class="ta-input-group">
             <label>2 Tons</label>
@@ -722,15 +722,88 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         
-        <div style="margin-bottom: 12px; font-weight: 600; color: var(--text-main);">Set Loading Priorities</div>
+        <div class="ta-section-label"><i class="fa-solid fa-sort-amount-up"></i> Set Loading Priorities</div>
         <div style="display: flex; flex-direction: column; gap: 4px;">
           ${priorityRow(1)}
           ${priorityRow(2)}
           ${priorityRow(3)}
         </div>
+        
+        <div class="ta-result-slot" data-po="${po.poName}"></div>
       </div>
       `;
     }).join('');
+  }
+
+  function renderTaResults(summary) {
+    if (!summary || summary.length === 0) return;
+    
+    summary.forEach(poResult => {
+      const slot = document.querySelector(`.ta-result-slot[data-po="${poResult.poName}"]`);
+      if (!slot) return;
+      
+      const totalWeight = poResult.trucks.reduce((s, t) => s + t.currentWeight, 0);
+      const totalTrucks = poResult.trucks.length;
+      
+      const trucksHtml = poResult.trucks.map(truck => {
+        const util = truck.utilization;
+        const barColor = util > 90 ? '#ef4444' : util > 70 ? '#f59e0b' : '#10b981';
+        
+        const itemsHtml = truck.items.map(item => {
+          const isFullPallet = Number.isInteger(item.pallets) && item.pallets > 0;
+          const palletClass = isFullPallet ? 'full' : 'partial';
+          const palletLabel = item.pallets > 0 ? item.pallets.toFixed(2) : '-';
+          
+          return `<tr>
+            <td class="sku-cell">${item.sku}</td>
+            <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.desc}">${item.desc}</td>
+            <td>${item.batch}</td>
+            <td class="num">${item.pcs.toLocaleString()}</td>
+            <td class="num">${item.cartons.toLocaleString()}</td>
+            <td class="num">${item.weight.toLocaleString()}</td>
+            <td class="num"><span class="pallet-chip ${palletClass}">${palletLabel}</span></td>
+          </tr>`;
+        }).join('');
+        
+        return `
+        <div class="ta-result-truck">
+          <div class="ta-result-truck-header">
+            <div>
+              <span class="ta-truck-badge"><i class="fa-solid fa-truck"></i> XE ${truck.id}</span>
+              <span style="margin-left: 8px; font-size: 0.82rem; color: var(--text-muted);">${truck.type}</span>
+            </div>
+            <div class="ta-truck-meta">
+              <span><span class="weight-val">${(truck.currentWeight / 1000).toFixed(2)}</span> / ${(truck.capacity / 1000).toFixed(0)}T</span>
+              <span>${util}%
+                <span class="ta-utilization-bar">
+                  <span class="ta-utilization-fill" style="width:${util}%; background:${barColor};"></span>
+                </span>
+              </span>
+            </div>
+          </div>
+          <table class="ta-result-table">
+            <thead><tr>
+              <th>SKU</th><th>Description</th><th>Batch</th>
+              <th style="text-align:right">PCS</th><th style="text-align:right">Cartons</th>
+              <th style="text-align:right">Weight</th><th style="text-align:right">Pallets</th>
+            </tr></thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+        </div>`;
+      }).join('');
+      
+      slot.innerHTML = `
+      <div class="ta-result-po" style="margin-top: 20px;">
+        <div class="ta-result-po-header">
+          <span><i class="fa-solid fa-chart-pie" style="margin-right: 8px;"></i> Allocation Result — ${poResult.poName}</span>
+          <div class="po-badge">
+            <span><i class="fa-solid fa-truck"></i> ${totalTrucks} trucks</span>
+            <span><i class="fa-solid fa-weight-hanging"></i> ${(totalWeight / 1000).toFixed(2)} Tons</span>
+          </div>
+        </div>
+        ${trucksHtml}
+      </div>`;
+    });
   }
 
   if (btnExecuteTa) {
@@ -775,6 +848,9 @@ document.addEventListener('DOMContentLoaded', () => {
           showResultModal(true, 'Allocation Complete', `<p>Trucks successfully allocated for ${data.posCount} POs.</p>`);
           btnDownloadTa.href = `/api/download/${encodeURIComponent(data.outputFile)}`;
           btnDownloadTa.classList.remove('hidden');
+          if (data.allocationSummary) {
+            renderTaResults(data.allocationSummary);
+          }
         } else {
           showResultModal(false, 'Allocation Failed', `<p>${data.error}</p>`);
         }

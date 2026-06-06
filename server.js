@@ -376,6 +376,7 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
       await storage.uploadFile(storage.FOLDERS.asnOutput || 'output/asn', outputFilename, result.outputBuffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       delete result.outputBuffer;
       result.outputFile = outputFilename;
+      // allocationSummary is kept in result for frontend display
     }
     
     res.json(result);
