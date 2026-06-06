@@ -884,6 +884,7 @@ tr:hover {
   margin-left: 6px;
 }
 .ta-utilization-fill {
+  display: block;
   height: 100%;
   border-radius: 4px;
   transition: width 0.5s ease;
