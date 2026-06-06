@@ -790,6 +790,24 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
        outWb.removeWorksheet(templateSheet.id);
     }
 
+    // Hide any remaining master data / list address sheets
+    outWb.eachSheet((ws) => {
+      const name = ws.name.toUpperCase();
+      if (name.includes('MASTER DATA') || name.includes('LIST ADDRESS')) {
+        ws.state = 'hidden';
+      }
+    });
+
+    // Set row height to 19 on all generated result sheets
+    for (const sheetName of generatedSheets) {
+      const ws = outWb.getWorksheet(sheetName);
+      if (ws) {
+        ws.eachRow((row) => {
+          row.height = 19;
+        });
+      }
+    }
+
     const outputBuffer = await outWb.xlsx.writeBuffer();
     return { success: true, posCount: config.length, outputBuffer, allocationSummary };
 

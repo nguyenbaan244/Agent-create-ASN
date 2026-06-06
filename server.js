@@ -372,7 +372,11 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
     const result = await truckAllocation.execute(obBuffer, goodsSpecBuffer, config);
     
     if (result.success && result.outputBuffer) {
-      const outputFilename = `Truck_Allocation_${Date.now()}.xlsx`;
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      const outputFilename = `Truck allocation ${dd}.${mm}.${yyyy}.xlsx`;
       await storage.uploadFile('output/truck-allocation', outputFilename, result.outputBuffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       delete result.outputBuffer;
       result.outputFile = outputFilename;
