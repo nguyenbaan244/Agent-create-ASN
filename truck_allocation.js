@@ -322,49 +322,101 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         }
       }
 
-      // Allocate lines to trucks
+      // Pass 1: Prioritize loading ONLY FULL PALLETS for all lines
       for (const line of lines) {
-        let remainingCartons = line.cartons;
-        let remainingPcs = line.pcs;
+        const skuSpec = spec.items[line.sku] || {};
+        const casePallet = skuSpec.casePallet || 0;
         
-        while (remainingCartons > 0 && truckPool.length > 0) {
-          // Find first truck with enough space for at least 1 carton
+        line.remainingCartons = line.cartons;
+        line.remainingPcs = line.pcs;
+        
+        if (!casePallet) continue;
+        
+        while (line.remainingCartons >= casePallet && truckPool.length > 0) {
+          // Find first truck with enough space for at least 1 FULL PALLET
+          const minWeightRequired = casePallet * (line.weightPerCarton || 1);
+          const truck = truckPool.find(t => (t.capacity - t.currentWeight) >= minWeightRequired);
+          if (!truck) break; // No truck can fit another full pallet of this SKU
+          
+          const availableWeight = truck.capacity - truck.currentWeight;
+          const maxPalletsCanFit = Math.floor(availableWeight / minWeightRequired);
+          const maxCartonsCanFit = maxPalletsCanFit * casePallet;
+          
+          const fullPalletsInLine = Math.floor(line.remainingCartons / casePallet);
+          const cartonsToLoad = Math.min(fullPalletsInLine * casePallet, maxCartonsCanFit);
+          
+          let pcsToLoad;
+          if (cartonsToLoad === line.remainingCartons) {
+             pcsToLoad = line.remainingPcs;
+          } else {
+             pcsToLoad = Math.round((cartonsToLoad / line.cartons) * line.pcs);
+          }
+          
+          const weightToLoad = cartonsToLoad * line.weightPerCarton;
+          
+          if (cartonsToLoad > 0) {
+             const existingItem = truck.items.find(i => i.row === line.row);
+             if (existingItem) {
+                existingItem.cartons += cartonsToLoad;
+                existingItem.pcs += pcsToLoad;
+                existingItem.totalWeight += weightToLoad;
+             } else {
+                truck.items.push({
+                  ...line,
+                  cartons: cartonsToLoad,
+                  pcs: pcsToLoad,
+                  totalWeight: weightToLoad
+                });
+             }
+             truck.currentWeight += weightToLoad;
+             line.remainingCartons -= cartonsToLoad;
+             line.remainingPcs -= pcsToLoad;
+          } else {
+             break;
+          }
+        }
+      }
+
+      // Pass 2: Allocate any remaining odd cartons to maximize payload
+      for (const line of lines) {
+        while (line.remainingCartons > 0 && truckPool.length > 0) {
+          // Find first truck with space for at least 1 carton
           const truck = truckPool.find(t => (t.capacity - t.currentWeight) >= (line.weightPerCarton || 1));
-          if (!truck) break; // All trucks full or cannot fit even 1 carton of this item
+          if (!truck) break; // All trucks full for this item
           
           const availableWeight = truck.capacity - truck.currentWeight;
           const maxCartonsCanFit = availableWeight / (line.weightPerCarton || 1);
           
-          let cartonsToLoad = Math.floor(maxCartonsCanFit); // Must be whole cartons
-          cartonsToLoad = Math.min(remainingCartons, cartonsToLoad);
+          let cartonsToLoad = Math.floor(maxCartonsCanFit);
+          cartonsToLoad = Math.min(line.remainingCartons, cartonsToLoad);
           
-          // Pallet rounding logic
-          const skuSpec = spec.items[line.sku];
-          if (skuSpec && skuSpec.casePallet && cartonsToLoad < remainingCartons) {
-            // We need to split. Try to snap to full pallets
-            const fullPalletsCanFit = Math.floor(cartonsToLoad / skuSpec.casePallet);
-            if (fullPalletsCanFit > 0) {
-              cartonsToLoad = fullPalletsCanFit * skuSpec.casePallet;
-            }
-            // If even 1 full pallet doesn't fit, just load what we can (odd cartons, but guaranteed integer)
-          }
-
-          const pcsToLoad = Math.round((cartonsToLoad / line.cartons) * line.pcs);
-          const weightToLoad = cartonsToLoad * line.weightPerCarton;
-
-          if (cartonsToLoad > 0) {
-            truck.items.push({
-              ...line,
-              cartons: cartonsToLoad,
-              pcs: pcsToLoad,
-              totalWeight: weightToLoad
-            });
-            truck.currentWeight += weightToLoad;
-            
-            remainingCartons -= cartonsToLoad;
-            remainingPcs -= pcsToLoad;
+          let pcsToLoad;
+          if (cartonsToLoad === line.remainingCartons) {
+             pcsToLoad = line.remainingPcs;
           } else {
-             // Edge case: carton is too heavy for remaining space
+             pcsToLoad = Math.round((cartonsToLoad / line.cartons) * line.pcs);
+          }
+          
+          const weightToLoad = cartonsToLoad * line.weightPerCarton;
+          
+          if (cartonsToLoad > 0) {
+             const existingItem = truck.items.find(i => i.row === line.row);
+             if (existingItem) {
+                existingItem.cartons += cartonsToLoad;
+                existingItem.pcs += pcsToLoad;
+                existingItem.totalWeight += weightToLoad;
+             } else {
+                truck.items.push({
+                  ...line,
+                  cartons: cartonsToLoad,
+                  pcs: pcsToLoad,
+                  totalWeight: weightToLoad
+                });
+             }
+             truck.currentWeight += weightToLoad;
+             line.remainingCartons -= cartonsToLoad;
+             line.remainingPcs -= pcsToLoad;
+          } else {
              break;
           }
         }
