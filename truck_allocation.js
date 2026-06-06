@@ -443,53 +443,44 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
       }
       
       // === STEP 3: Allocate ALL odd-carton items to trucks ===
+      // Each odd item MUST go to exactly ONE truck — never split the odd portion
       for (const item of oddCartonItems) {
-        let remaining = item.cartons;
-        let remainPcs = item.pcs;
+        const totalOddWeight = item.cartons * (item.weightPerCarton || 1);
         
-        while (remaining > 0) {
-           const requiredWeight = item.weightPerCarton || 1;
-           
-           // Prefer a truck that ALREADY carries this SKU
-           let truck = truckPool.find(t => t.items.some(i => i.row === item.row) && (t.capacity - t.currentWeight) >= requiredWeight);
-           
-           // Otherwise pick truck with most space
-           if (!truck) {
-               truckPool.sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
-               truck = truckPool.find(t => (t.capacity - t.currentWeight) >= requiredWeight);
-           }
-           if (!truck) break;
-           
-           const space = truck.capacity - truck.currentWeight;
-           let cartonsToLoad = Math.floor(space / requiredWeight);
-           cartonsToLoad = Math.min(remaining, cartonsToLoad);
-           if (cartonsToLoad <= 0) break;
-           
-           let pcsToLoad;
-           if (cartonsToLoad >= remaining) {
-              pcsToLoad = remainPcs;
-           } else {
-              pcsToLoad = Math.round((cartonsToLoad / item.cartons) * item.pcs);
-           }
-           const weightToLoad = cartonsToLoad * requiredWeight;
-           
-           const existing = truck.items.find(i => i.row === item.row);
-           if (existing) {
-              existing.cartons += cartonsToLoad;
-              existing.pcs += pcsToLoad;
-              existing.totalWeight += weightToLoad;
-           } else {
-              truck.items.push({
-                 ...item,
-                 cartons: cartonsToLoad,
-                 pcs: pcsToLoad,
-                 totalWeight: weightToLoad
-              });
-           }
-           truck.currentWeight += weightToLoad;
-           remaining -= cartonsToLoad;
-           remainPcs -= pcsToLoad;
+        // Best fit: find truck with LEAST space that can hold ALL odd cartons
+        let candidates = truckPool.filter(t => (t.capacity - t.currentWeight) >= totalOddWeight);
+        let truck = null;
+        
+        if (candidates.length > 0) {
+           candidates.sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
+           truck = candidates[0];
+        } else {
+           // No truck can fit all odd cartons — last resort, pick truck with most space
+           truckPool.sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
+           truck = truckPool.find(t => (t.capacity - t.currentWeight) >= (item.weightPerCarton || 1));
         }
+        
+        if (!truck) continue;
+        
+        const cartonsToLoad = Math.min(item.cartons, Math.floor((truck.capacity - truck.currentWeight) / (item.weightPerCarton || 1)));
+        if (cartonsToLoad <= 0) continue;
+        
+        const weightToLoad = cartonsToLoad * (item.weightPerCarton || 1);
+        
+        const existing = truck.items.find(i => i.row === item.row);
+        if (existing) {
+           existing.cartons += cartonsToLoad;
+           existing.pcs += item.pcs;
+           existing.totalWeight += weightToLoad;
+        } else {
+           truck.items.push({
+              ...item,
+              cartons: cartonsToLoad,
+              pcs: item.pcs,
+              totalWeight: weightToLoad
+           });
+        }
+        truck.currentWeight += weightToLoad;
       }
       
       // Sort truckPool back by ID to preserve display order in the Excel sheet
