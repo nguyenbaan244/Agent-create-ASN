@@ -299,16 +299,11 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
       }
     }
 
-    // Insert CBM column right after the Pallet column
+    // CBM column: placed right after Pallet column (NO spliceColumns — avoids XML corruption)
     let cbmColIdx = -1;
     if (palletColIdx !== -1 && headerRowIdxJS !== -1) {
       cbmColIdx = palletColIdx + 1;
-      templateSheet.spliceColumns(cbmColIdx, 0, []);
-      const cbmHeader = templateSheet.getCell(headerRowIdxJS, cbmColIdx);
-      cbmHeader.value = 'CBM';
-      const refCell = templateSheet.getCell(headerRowIdxJS, palletColIdx);
-      cbmHeader.style = refCell ? refCell.style : {};
-      templateSheet.getColumn(cbmColIdx).width = 12;
+      // Don't splice — just mark the index. Header + values will be written per-sheet.
     }
 
     const generatedSheets = [];
@@ -905,14 +900,14 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
       const newSheet = outWb.addWorksheet(poName);
       generatedSheets.push(poName);
       
-      // Clone columns width
-      newSheet.columns = templateSheet.columns.map(c => ({ width: c.width }));
-      if (templateSheet.getColumn(palletColIdx)) {
-         newSheet.getColumn(palletColIdx).width = templateSheet.getColumn(palletColIdx).width || 15;
+      // Clone columns width safely (avoid undefined widths that corrupt Excel XML)
+      const templateCols = templateSheet.columns;
+      for (let ci = 0; ci < templateCols.length; ci++) {
+        const w = templateCols[ci].width;
+        if (w && w > 0) newSheet.getColumn(ci + 1).width = w;
       }
-      if (cbmColIdx !== -1) {
-         newSheet.getColumn(cbmColIdx).width = 12;
-      }
+      if (palletColIdx > 0) newSheet.getColumn(palletColIdx).width = 15;
+      if (cbmColIdx > 0) newSheet.getColumn(cbmColIdx).width = 12;
       
       // Clone header and rows above
       for (let r = 1; r <= headerRowIdxJS; r++) {
@@ -924,6 +919,13 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
           destCell.value = cell.value;
           destCell.style = cell.style;
         });
+      }
+      // Write CBM header on this new sheet
+      if (cbmColIdx > 0) {
+        const cbmHeader = newSheet.getCell(headerRowIdxJS, cbmColIdx);
+        cbmHeader.value = 'CBM';
+        const refCell = newSheet.getCell(headerRowIdxJS, palletColIdx);
+        cbmHeader.style = refCell ? { ...refCell.style } : {};
       }
       
       const styleTemplateRow = templateSheet.getRow(headerRowIdxJS + 1);
@@ -942,28 +944,34 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
            styleTemplateRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
              const destCell = destRow.getCell(colNumber);
              destCell.style = cell.style;
-                          let val;
-              if (colNumber === palletColIdx) {
-                 const sku = data[i][skuIdx];
-                 const cartons = parseFloat(data[i][cartonIdx]) || 0;
-                 const casePallet = (spec.items[sku] && spec.items[sku].casePallet) ? spec.items[sku].casePallet : 0;
-                 const pallets = casePallet ? (cartons / casePallet) : 0;
-                 val = pallets ? parseFloat(pallets.toFixed(2)) : null;
-              } else if (colNumber === cbmColIdx) {
-                 const sku = data[i][skuIdx];
-                 const cartons = parseFloat(data[i][cartonIdx]) || 0;
-                 const cbmCase = (spec.items[sku] && spec.items[sku].cbmCase) ? spec.items[sku].cbmCase : 0;
-                 val = cbmCase ? parseFloat((cartons * cbmCase).toFixed(3)) : null;
-              } else if (colNumber > (cbmColIdx !== -1 ? cbmColIdx : palletColIdx)) {
-                 const offset = (cbmColIdx !== -1 ? 2 : 1);
-                 val = data[i][colNumber - 1 - offset];
-              } else if (colNumber > palletColIdx) {
-                 val = data[i][colNumber - 2];
-              } else {
-                 val = data[i][colNumber - 1];
-              }
-              destCell.value = val !== undefined ? val : null;
+             // Skip computed columns (pallet, CBM) — written separately below
+             if (colNumber === palletColIdx || colNumber === cbmColIdx) return;
+             // For columns after the inserted ones, offset back to source data
+             let srcCol = colNumber;
+             if (cbmColIdx > 0 && colNumber > cbmColIdx) srcCol -= 2;
+             else if (palletColIdx > 0 && colNumber > palletColIdx) srcCol -= 1;
+             destCell.value = data[i][srcCol - 1] !== undefined ? data[i][srcCol - 1] : null;
            });
+           
+           // Write Pallet column
+           if (palletColIdx > 0) {
+             const sku = data[i][skuIdx];
+             const cartons = parseFloat(data[i][cartonIdx]) || 0;
+             const casePallet = (spec.items[sku] && spec.items[sku].casePallet) ? spec.items[sku].casePallet : 0;
+             const pallets = casePallet ? (cartons / casePallet) : 0;
+             const pCell = destRow.getCell(palletColIdx);
+             pCell.value = pallets ? parseFloat(pallets.toFixed(2)) : null;
+             pCell.style = styleTemplateRow.getCell(palletColIdx - 1) ? styleTemplateRow.getCell(palletColIdx - 1).style : {};
+           }
+           // Write CBM column
+           if (cbmColIdx > 0) {
+             const sku = data[i][skuIdx];
+             const cartons = parseFloat(data[i][cartonIdx]) || 0;
+             const cbmCase = (spec.items[sku] && spec.items[sku].cbmCase) ? spec.items[sku].cbmCase : 0;
+             const cCell = destRow.getCell(cbmColIdx);
+             cCell.value = cbmCase ? parseFloat((cartons * cbmCase).toFixed(3)) : null;
+             cCell.style = styleTemplateRow.getCell(palletColIdx - 1) ? styleTemplateRow.getCell(palletColIdx - 1).style : {};
+           }
            
            const cartons = parseFloat(data[i][cartonIdx]) || 0;
            const sku = data[i][skuIdx] ? data[i][skuIdx].toString().trim() : '';
@@ -1008,20 +1016,13 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
           styleTemplateRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             const destCell = destRow.getCell(colNumber);
             destCell.style = cell.style;
-            let val;
-            if (colNumber === palletColIdx) {
-                // skip, computed below
-            } else if (colNumber === cbmColIdx) {
-                // skip, computed below
-            } else if (colNumber > (cbmColIdx !== -1 ? cbmColIdx : palletColIdx)) {
-                const offset = (cbmColIdx !== -1 ? 2 : 1);
-                val = item.row[colNumber - 1 - offset];
-            } else if (colNumber > palletColIdx) {
-                val = item.row[colNumber - 2];
-            } else {
-                val = item.row[colNumber - 1];
-            }
-            destCell.value = val !== undefined ? val : null;
+            // Skip computed columns
+            if (colNumber === palletColIdx || colNumber === cbmColIdx) return;
+            // Offset back to source data
+            let srcCol = colNumber;
+            if (cbmColIdx > 0 && colNumber > cbmColIdx) srcCol -= 2;
+            else if (palletColIdx > 0 && colNumber > palletColIdx) srcCol -= 1;
+            destCell.value = item.row[srcCol - 1] !== undefined ? item.row[srcCol - 1] : null;
           });
           
           if (poColIdx !== -1) destRow.getCell(poColIdx).value = `${poName}_T${truck.id}`;
