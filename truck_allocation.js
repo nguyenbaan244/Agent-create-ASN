@@ -604,58 +604,74 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
       // Track which lines still have cartons to assign
       const remaining = lines.map(l => ({ ...l, remainCartons: l.cartons, remainPcs: l.pcs }));
       
-      // === B1: Volume-Priority Assignment ===
+      // === B1: Volume-Priority Assignment (multi-pass) ===
       // Assign each line (biggest→smallest) to the LARGEST truck first (most space).
-      // If a line exceeds capacity, only take FULL PALLETS — never split odd.
-      // Rebalance later will push small items to smaller trucks.
+      // LOOP until all cartons assigned or no more trucks can accept.
+      // If a line exceeds one truck, split across multiple trucks using full pallets.
       
-      for (const r of remaining) {
-        if (r.remainCartons <= 0) continue;
+      let assignedSomething = true;
+      while (assignedSomething) {
+        assignedSomething = false;
         
-        const skuSpec = spec.items[r.sku] || {};
-        const casePallet = skuSpec.casePallet || 0;
-        const totalWeight = r.remainCartons * (r.weightPerCarton || 1);
-        
-        // Find truck with MOST remaining space (prioritize large trucks)
-        let eligibleTrucks = truckPool
-          .filter(t => canAssignToTruck(r.sku, t.id) && (t.capacity - t.currentWeight) >= (r.weightPerCarton || 1))
-          .sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
-        
-        if (eligibleTrucks.length === 0) continue;
-        const truck = eligibleTrucks[0];
-        const space = truck.capacity - truck.currentWeight;
-        
-        if (totalWeight <= space) {
-          // Entire line fits — assign all
-          truck.items.push({
-            ...r,
-            cartons: r.remainCartons,
-            pcs: r.remainPcs,
-            totalWeight: totalWeight
-          });
-          truck.currentWeight += totalWeight;
-          recordAssignment(r.sku, truck.id);
-          r.remainCartons = 0;
-          r.remainPcs = 0;
-        } else if (casePallet > 0) {
-          // Line exceeds capacity — only take FULL PALLETS that fit
-          const palletWeight = casePallet * (r.weightPerCarton || 1);
-          const palletsCanFit = Math.floor(space / palletWeight);
-          if (palletsCanFit > 0) {
-            const cartonsToLoad = palletsCanFit * casePallet;
-            const pcsToLoad = Math.round((cartonsToLoad / r.cartons) * r.pcs);
-            const wt = cartonsToLoad * (r.weightPerCarton || 1);
-            
+        for (const r of remaining) {
+          if (r.remainCartons <= 0) continue;
+          
+          const skuSpec = spec.items[r.sku] || {};
+          const casePallet = skuSpec.casePallet || 0;
+          const totalWeight = r.remainCartons * (r.weightPerCarton || 1);
+          
+          // Find truck with MOST remaining space (prioritize large trucks)
+          let eligibleTrucks = truckPool
+            .filter(t => canAssignToTruck(r.sku, t.id) && (t.capacity - t.currentWeight) >= (r.weightPerCarton || 1))
+            .sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
+          
+          if (eligibleTrucks.length === 0) continue;
+          const truck = eligibleTrucks[0];
+          const space = truck.capacity - truck.currentWeight;
+          
+          if (totalWeight <= space) {
+            // Entire remaining line fits — assign all
             truck.items.push({
               ...r,
-              cartons: cartonsToLoad,
-              pcs: pcsToLoad,
-              totalWeight: wt
+              cartons: r.remainCartons,
+              pcs: r.remainPcs,
+              totalWeight: totalWeight
             });
-            truck.currentWeight += wt;
+            truck.currentWeight += totalWeight;
             recordAssignment(r.sku, truck.id);
-            r.remainCartons -= cartonsToLoad;
-            r.remainPcs -= pcsToLoad;
+            r.remainCartons = 0;
+            r.remainPcs = 0;
+            assignedSomething = true;
+          } else if (casePallet > 0) {
+            // Line exceeds capacity — only take FULL PALLETS that fit
+            const palletWeight = casePallet * (r.weightPerCarton || 1);
+            const palletsCanFit = Math.floor(space / palletWeight);
+            if (palletsCanFit > 0) {
+              const cartonsToLoad = palletsCanFit * casePallet;
+              const pcsToLoad = cartonsToLoad >= r.remainCartons 
+                ? r.remainPcs 
+                : Math.round((cartonsToLoad / r.cartons) * r.pcs);
+              const wt = cartonsToLoad * (r.weightPerCarton || 1);
+              
+              const existing = truck.items.find(i => i.row === r.row);
+              if (existing) {
+                existing.cartons += cartonsToLoad;
+                existing.pcs += pcsToLoad;
+                existing.totalWeight += wt;
+              } else {
+                truck.items.push({
+                  ...r,
+                  cartons: cartonsToLoad,
+                  pcs: pcsToLoad,
+                  totalWeight: wt
+                });
+              }
+              truck.currentWeight += wt;
+              recordAssignment(r.sku, truck.id);
+              r.remainCartons -= cartonsToLoad;
+              r.remainPcs -= pcsToLoad;
+              assignedSomething = true;
+            }
           }
         }
       }
