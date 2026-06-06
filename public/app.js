@@ -683,6 +683,16 @@ document.addEventListener('DOMContentLoaded', () => {
               ${batchesOptions}
             </select>
           </div>
+          <div class="ta-input-group">
+            <select class="priority-truck">
+              <option value="">-- Truck --</option>
+              <option value="2T">2 Tons</option>
+              <option value="5T">5 Tons</option>
+              <option value="8T">8 Tons</option>
+              <option value="15T">15 Tons</option>
+              <option value="Cont40">Cont 40ft</option>
+            </select>
+          </div>
         </div>
       `;
 
@@ -843,8 +853,9 @@ document.addEventListener('DOMContentLoaded', () => {
         card.querySelectorAll('.priority-row').forEach(pRow => {
            const sku = pRow.querySelector('.priority-sku').value;
            const batch = pRow.querySelector('.priority-batch').value;
+           const truckType = pRow.querySelector('.priority-truck').value;
            if (sku || batch) {
-             priorities.push({sku, batch});
+             priorities.push({sku, batch, truckType});
            }
         });
         

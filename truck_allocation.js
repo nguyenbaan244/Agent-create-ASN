@@ -340,6 +340,47 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         }
       }
 
+      // === STEP 0: Force-assign priority items with specified truck type ===
+      if (priorities && priorities.length > 0) {
+        for (const prio of priorities) {
+          if (!prio.truckType) continue; // No truck specified, skip (handled by normal priority scoring)
+          
+          // Find matching lines
+          const matchingLines = lines.filter(line => {
+            const skuMatch = !prio.sku || line.sku === prio.sku;
+            const batchMatch = !prio.batch || line.batch === prio.batch;
+            return skuMatch && batchMatch;
+          });
+          
+          if (matchingLines.length === 0) continue;
+          
+          // Find the first truck of the specified type with available space
+          const targetTruck = truckPool.find(t => t.type === prio.truckType);
+          if (!targetTruck) continue;
+          
+          // Force-load ALL cartons of matching lines into this truck
+          for (const line of matchingLines) {
+            const weightToLoad = line.cartons * line.weightPerCarton;
+            
+            targetTruck.items.push({
+              ...line,
+              cartons: line.cartons,
+              pcs: line.pcs,
+              totalWeight: weightToLoad
+            });
+            targetTruck.currentWeight += weightToLoad;
+            
+            // Mark line as fully allocated so it's excluded from normal flow
+            line.cartons = 0;
+            line.pcs = 0;
+            line.totalWeight = 0;
+          }
+        }
+        
+        // Remove fully allocated lines
+        lines = lines.filter(l => l.cartons > 0);
+      }
+
       // === STEP 1: Pre-split every SKU into full-pallet items and odd-carton items ===
       const fullPalletItems = [];
       const oddCartonItems = [];
