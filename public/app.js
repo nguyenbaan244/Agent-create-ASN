@@ -654,6 +654,9 @@ document.addEventListener('DOMContentLoaded', () => {
       taActions.classList.add('hidden');
       taPoContainer.innerHTML = '';
       btnDownloadTa.classList.add('hidden');
+      // Reset algorithm to V2
+      const v2Radio = document.querySelector('input[name="ta-version"][value="v2"]');
+      if (v2Radio) v2Radio.checked = true;
       const rc = document.getElementById('ta-results-container');
       if (rc) { rc.innerHTML = ''; rc.classList.add('hidden'); }
     });
