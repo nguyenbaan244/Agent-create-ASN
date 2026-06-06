@@ -947,11 +947,15 @@ document.addEventListener('DOMContentLoaded', () => {
       loadingModal.classList.add('active');
       document.getElementById('loading-text').innerText = 'Running allocation algorithm...';
       
+      // Get selected algorithm version
+      const versionRadio = document.querySelector('input[name="ta-version"]:checked');
+      const version = versionRadio ? versionRadio.value : 'v1';
+      
       try {
         const res = await fetch('/api/truck-allocation/execute', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: taFilenameOnServer, config })
+          body: JSON.stringify({ filename: taFilenameOnServer, config, version })
         });
         const data = await res.json();
         

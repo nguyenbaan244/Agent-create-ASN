@@ -359,7 +359,7 @@ app.post('/api/truck-allocation/preview', upload.single('file'), async (req, res
 // 15. Execute Truck Allocation
 app.post('/api/truck-allocation/execute', async (req, res) => {
   try {
-    const { filename, config } = req.body;
+    const { filename, config, version } = req.body;
     if (!filename || !config) return res.status(400).json({ success: false, error: 'Missing configuration or filename' });
 
     // Download OB Request
@@ -369,7 +369,7 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
     const masterData = await storage.downloadAllMasterData();
     const goodsSpecBuffer = masterData.goodsSpecBuffer; // Might be null if missing, that's handled in logic
 
-    const result = await truckAllocation.execute(obBuffer, goodsSpecBuffer, config);
+    const result = await truckAllocation.execute(obBuffer, goodsSpecBuffer, config, version || 'v1');
     
     if (result.success && result.outputBuffer) {
       const now = new Date();

@@ -303,7 +303,16 @@
                 <!-- Dynamically populated PO cards -->
               </div>
 
-              <div id="ta-actions" class="hidden" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+              <div id="ta-actions" class="hidden" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; align-items: center; gap: 16px; flex-wrap: wrap;">
+                 <div style="display:flex; align-items:center; gap:8px; margin-right:auto; background:var(--bg-main); padding:6px 14px; border-radius:10px; border:1px solid var(--border);">
+                   <span style="font-size:0.82rem; color:var(--text-muted); font-weight:600;">Algorithm:</span>
+                   <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.82rem;">
+                     <input type="radio" name="ta-version" value="v1" checked style="accent-color:var(--primary);"> V1
+                   </label>
+                   <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.82rem;">
+                     <input type="radio" name="ta-version" value="v2" style="accent-color:var(--primary);"> V2
+                   </label>
+                 </div>
                  <a id="btn-download-ta" class="btn-primary hidden" style="text-decoration: none; background: #10b981;" download>
                     <i class="fa-solid fa-download"></i> Download Excel
                  </a>

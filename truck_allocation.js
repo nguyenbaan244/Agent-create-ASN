@@ -10,10 +10,13 @@
  *   - STEP 2: Allocate full pallets across trucks (best-fit descending)
  *   - STEP 3: Consolidate all odd cartons per SKU into ONE truck (best-fit)
  * 
- * Version 2 (v2) — TBD (reserved for future logic improvement)
- *   If v2 doesn't perform well, system can revert to v1.
+ * Version 2 (v2) — "Volume-Priority Pairing"
+ *   Strategy: Large→Large truck pairing → Small pairing → Full-pallet fill → Odd consolidation
+ *   - B1: Assign largest volume to largest truck, pair with smallest line, fill with full pallets
+ *   - B2: Remaining → full pallets first, then odd cartons
+ *   - Constraint: Max 2 splits (trucks) per SKU
  * 
- * Active Version: v1
+ * Active Version: selectable via UI (V1 / V2)
  * ===================================================================
  */
 
@@ -197,7 +200,7 @@ function preview(obBuffer) {
   }
 }
 
-async function execute(obBuffer, goodsSpecBuffer, config) {
+async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
   try {
     let ExcelJS;
     try {
@@ -404,6 +407,7 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         lines = lines.filter(l => l.cartons > 0);
       }
 
+      if (version === 'v1') {
       // ============================================================
       // ALLOCATION LOGIC — VERSION 1: Pallet-First Bin Packing
       // ============================================================
@@ -565,6 +569,253 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         }
         truck.currentWeight += weightToLoad;
       }
+
+      } else {
+      // ============================================================
+      // ALLOCATION LOGIC — VERSION 2: Volume-Priority Pairing
+      // ============================================================
+      // B1: Large volume → large truck, pair large+small, fill with full pallets
+      // B2: Remaining → full pallets first, then odd cartons
+      // Constraint: Max 2 splits (trucks) per SKU
+      
+      const skuTruckMap = {}; // { sku: Set<truckId> } — track split count
+      
+      function canAssignToTruck(sku, truckId) {
+        if (!skuTruckMap[sku]) return true;
+        if (skuTruckMap[sku].has(truckId)) return true; // already in this truck
+        return skuTruckMap[sku].size < 2; // max 2 different trucks
+      }
+      function recordAssignment(sku, truckId) {
+        if (!skuTruckMap[sku]) skuTruckMap[sku] = new Set();
+        skuTruckMap[sku].add(truckId);
+      }
+      function getExistingTrucks(sku) {
+        if (!skuTruckMap[sku]) return [];
+        return Array.from(skuTruckMap[sku]);
+      }
+      
+      // Sort lines by totalWeight DESCENDING (biggest volume first)
+      lines.sort((a, b) => b.totalWeight - a.totalWeight);
+      
+      // Sort truck pool by capacity DESCENDING (biggest truck first)
+      truckPool.sort((a, b) => b.capacity - a.capacity);
+      
+      // Track which lines still have cartons to assign
+      const remaining = lines.map(l => ({ ...l, remainCartons: l.cartons, remainPcs: l.pcs }));
+      
+      // === B1: Volume-Priority Pairing ===
+      for (const truck of truckPool) {
+        const space = () => truck.capacity - truck.currentWeight;
+        if (space() <= 0) continue;
+        
+        // 1. Pick LARGEST remaining line that fits and respects split constraint
+        const largeIdx = remaining.findIndex(r => 
+          r.remainCartons > 0 && 
+          canAssignToTruck(r.sku, truck.id) &&
+          (r.weightPerCarton || 1) <= space()
+        );
+        
+        if (largeIdx === -1) continue;
+        const large = remaining[largeIdx];
+        
+        // Load as much of the large line as possible
+        const maxCartonsLarge = Math.min(large.remainCartons, Math.floor(space() / (large.weightPerCarton || 1)));
+        if (maxCartonsLarge <= 0) continue;
+        
+        const pcsLarge = maxCartonsLarge >= large.remainCartons ? large.remainPcs : Math.round((maxCartonsLarge / large.cartons) * large.pcs);
+        const weightLarge = maxCartonsLarge * (large.weightPerCarton || 1);
+        
+        truck.items.push({
+          ...large,
+          cartons: maxCartonsLarge,
+          pcs: pcsLarge,
+          totalWeight: weightLarge
+        });
+        truck.currentWeight += weightLarge;
+        recordAssignment(large.sku, truck.id);
+        large.remainCartons -= maxCartonsLarge;
+        large.remainPcs -= pcsLarge;
+        
+        // 2. Try to pair with SMALLEST remaining line
+        if (space() > 0) {
+          // Search from the end (smallest) of remaining
+          for (let s = remaining.length - 1; s >= 0; s--) {
+            const small = remaining[s];
+            if (small.remainCartons <= 0) continue;
+            if (!canAssignToTruck(small.sku, truck.id)) continue;
+            
+            const smallWeight = small.remainCartons * (small.weightPerCarton || 1);
+            if (smallWeight <= space()) {
+              // Fits entirely
+              truck.items.push({
+                ...small,
+                cartons: small.remainCartons,
+                pcs: small.remainPcs,
+                totalWeight: smallWeight
+              });
+              truck.currentWeight += smallWeight;
+              recordAssignment(small.sku, truck.id);
+              small.remainCartons = 0;
+              small.remainPcs = 0;
+              break; // One small pairing per truck
+            }
+          }
+        }
+        
+        // 3. If still has space, fill with full pallets from next largest lines
+        if (space() > 0) {
+          for (const r of remaining) {
+            if (r.remainCartons <= 0) continue;
+            if (!canAssignToTruck(r.sku, truck.id)) continue;
+            
+            const skuSpec = spec.items[r.sku] || {};
+            const casePallet = skuSpec.casePallet || 0;
+            if (casePallet <= 0) continue;
+            
+            const palletWeight = casePallet * (r.weightPerCarton || 1);
+            if (palletWeight > space()) continue;
+            
+            const palletsCanFit = Math.floor(space() / palletWeight);
+            const palletsAvailable = Math.floor(r.remainCartons / casePallet);
+            const palletsToLoad = Math.min(palletsCanFit, palletsAvailable);
+            if (palletsToLoad <= 0) continue;
+            
+            const cartonsToLoad = palletsToLoad * casePallet;
+            const pcsToLoad = cartonsToLoad >= r.remainCartons ? r.remainPcs : Math.round((cartonsToLoad / r.cartons) * r.pcs);
+            const weightToLoad = cartonsToLoad * (r.weightPerCarton || 1);
+            
+            const existing = truck.items.find(i => i.row === r.row);
+            if (existing) {
+              existing.cartons += cartonsToLoad;
+              existing.pcs += pcsToLoad;
+              existing.totalWeight += weightToLoad;
+            } else {
+              truck.items.push({
+                ...r,
+                cartons: cartonsToLoad,
+                pcs: pcsToLoad,
+                totalWeight: weightToLoad
+              });
+            }
+            truck.currentWeight += weightToLoad;
+            recordAssignment(r.sku, truck.id);
+            r.remainCartons -= cartonsToLoad;
+            r.remainPcs -= pcsToLoad;
+            
+            if (space() <= 0) break;
+          }
+        }
+      }
+      
+      // === B2: Remaining volume — full pallets first, then odd ===
+      const leftover = remaining.filter(r => r.remainCartons > 0);
+      
+      // Split leftover into full-pallet + odd
+      const fullPalletLeft = [];
+      const oddLeft = [];
+      
+      for (const r of leftover) {
+        const skuSpec = spec.items[r.sku] || {};
+        const casePallet = skuSpec.casePallet || 0;
+        
+        if (casePallet > 0) {
+          const fullPallets = Math.floor(r.remainCartons / casePallet);
+          const fullCartons = fullPallets * casePallet;
+          const oddCartons = r.remainCartons - fullCartons;
+          
+          if (fullCartons > 0) {
+            const pcs = fullCartons >= r.remainCartons ? r.remainPcs : Math.round((fullCartons / r.cartons) * r.pcs);
+            fullPalletLeft.push({
+              ...r, cartons: fullCartons, remainCartons: fullCartons, pcs, remainPcs: pcs,
+              totalWeight: fullCartons * r.weightPerCarton, casePallet
+            });
+          }
+          if (oddCartons > 0) {
+            const pcs = r.remainPcs - (fullCartons > 0 ? Math.round((fullCartons / r.cartons) * r.pcs) : 0);
+            oddLeft.push({
+              ...r, cartons: oddCartons, remainCartons: oddCartons, pcs, remainPcs: pcs,
+              totalWeight: oddCartons * r.weightPerCarton, casePallet
+            });
+          }
+        } else {
+          oddLeft.push({ ...r, casePallet: 0 });
+        }
+      }
+      
+      // Assign full pallets (best-fit, respecting max split)
+      fullPalletLeft.sort((a, b) => b.totalWeight - a.totalWeight);
+      for (const item of fullPalletLeft) {
+        let rem = item.remainCartons;
+        let remPcs = item.remainPcs;
+        const cp = item.casePallet;
+        
+        while (rem >= cp) {
+          const palletWt = cp * (item.weightPerCarton || 1);
+          
+          // Find trucks this SKU can go to
+          let fitTrucks;
+          if (skuTruckMap[item.sku] && skuTruckMap[item.sku].size >= 2) {
+            // Must use existing trucks only
+            const existingIds = getExistingTrucks(item.sku);
+            fitTrucks = truckPool.filter(t => existingIds.includes(t.id) && (t.capacity - t.currentWeight) >= palletWt);
+          } else {
+            fitTrucks = truckPool.filter(t => (t.capacity - t.currentWeight) >= palletWt);
+          }
+          if (fitTrucks.length === 0) break;
+          
+          fitTrucks.sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
+          const truck = fitTrucks[0];
+          
+          const palletsCanFit = Math.floor((truck.capacity - truck.currentWeight) / palletWt);
+          const palletsToLoad = Math.min(palletsCanFit, Math.floor(rem / cp));
+          const cartonsToLoad = palletsToLoad * cp;
+          const pcsToLoad = cartonsToLoad >= rem ? remPcs : Math.round((cartonsToLoad / item.cartons) * item.pcs);
+          const wt = cartonsToLoad * (item.weightPerCarton || 1);
+          
+          const existing = truck.items.find(i => i.row === item.row);
+          if (existing) { existing.cartons += cartonsToLoad; existing.pcs += pcsToLoad; existing.totalWeight += wt; }
+          else { truck.items.push({ ...item, cartons: cartonsToLoad, pcs: pcsToLoad, totalWeight: wt }); }
+          truck.currentWeight += wt;
+          recordAssignment(item.sku, truck.id);
+          rem -= cartonsToLoad;
+          remPcs -= pcsToLoad;
+        }
+      }
+      
+      // Assign odd cartons (best-fit, respecting max split)
+      for (const item of oddLeft) {
+        if (item.remainCartons <= 0) continue;
+        const oddWt = item.remainCartons * (item.weightPerCarton || 1);
+        
+        let fitTrucks;
+        if (skuTruckMap[item.sku] && skuTruckMap[item.sku].size >= 2) {
+          const existingIds = getExistingTrucks(item.sku);
+          fitTrucks = truckPool.filter(t => existingIds.includes(t.id) && (t.capacity - t.currentWeight) >= oddWt);
+        } else {
+          fitTrucks = truckPool.filter(t => (t.capacity - t.currentWeight) >= oddWt);
+        }
+        
+        if (fitTrucks.length === 0) {
+          // Fallback: any truck with space
+          fitTrucks = truckPool.filter(t => (t.capacity - t.currentWeight) >= (item.weightPerCarton || 1));
+        }
+        if (fitTrucks.length === 0) continue;
+        
+        fitTrucks.sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
+        const truck = fitTrucks[0];
+        
+        const cartonsToLoad = Math.min(item.remainCartons, Math.floor((truck.capacity - truck.currentWeight) / (item.weightPerCarton || 1)));
+        if (cartonsToLoad <= 0) continue;
+        const wt = cartonsToLoad * (item.weightPerCarton || 1);
+        
+        const existing = truck.items.find(i => i.row === item.row);
+        if (existing) { existing.cartons += cartonsToLoad; existing.pcs += item.remainPcs; existing.totalWeight += wt; }
+        else { truck.items.push({ ...item, cartons: cartonsToLoad, pcs: item.remainPcs, totalWeight: wt }); }
+        truck.currentWeight += wt;
+        recordAssignment(item.sku, truck.id);
+      }
+
+      } // end version check
       
       // Build allocation summary for frontend display
       const poSummary = {
