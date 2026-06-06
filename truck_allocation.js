@@ -625,6 +625,13 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
             .filter(t => canAssignToTruck(r.sku, t.id) && (t.capacity - t.currentWeight) >= (r.weightPerCarton || 1))
             .sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
           
+          // Fallback: if SKU split limit blocks all trucks, relax constraint
+          if (eligibleTrucks.length === 0) {
+            eligibleTrucks = truckPool
+              .filter(t => (t.capacity - t.currentWeight) >= (r.weightPerCarton || 1))
+              .sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
+          }
+          
           if (eligibleTrucks.length === 0) continue;
           const truck = eligibleTrucks[0];
           const space = truck.capacity - truck.currentWeight;
@@ -783,10 +790,13 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
           // Find trucks this SKU can go to
           let fitTrucks;
           if (skuTruckMap[item.sku] && skuTruckMap[item.sku].size >= 2) {
-            // Must use existing trucks only
             const existingIds = getExistingTrucks(item.sku);
             fitTrucks = truckPool.filter(t => existingIds.includes(t.id) && (t.capacity - t.currentWeight) >= palletWt);
           } else {
+            fitTrucks = truckPool.filter(t => (t.capacity - t.currentWeight) >= palletWt);
+          }
+          // Fallback: relax SKU constraint if no trucks available
+          if (fitTrucks.length === 0) {
             fitTrucks = truckPool.filter(t => (t.capacity - t.currentWeight) >= palletWt);
           }
           if (fitTrucks.length === 0) break;
