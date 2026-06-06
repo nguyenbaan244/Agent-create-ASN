@@ -959,7 +959,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (data.success) {
           showResultModal(true, 'Allocation Complete', `<p>Trucks successfully allocated for ${data.posCount} POs.</p>`);
-          taLastDownloadHref = `/api/download/${encodeURIComponent(data.outputFile)}`;
+          taLastDownloadHref = `/api/truck-allocation/download/${encodeURIComponent(data.outputFile)}`;
           btnDownloadTa.href = taLastDownloadHref;
           btnDownloadTa.classList.remove('hidden');
           if (data.allocationSummary) {

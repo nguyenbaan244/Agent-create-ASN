@@ -373,7 +373,7 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
     
     if (result.success && result.outputBuffer) {
       const outputFilename = `Truck_Allocation_${Date.now()}.xlsx`;
-      await storage.uploadFile(storage.FOLDERS.asnOutput || 'output/asn', outputFilename, result.outputBuffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      await storage.uploadFile('output/truck-allocation', outputFilename, result.outputBuffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       delete result.outputBuffer;
       result.outputFile = outputFilename;
       // allocationSummary is kept in result for frontend display
@@ -382,6 +382,19 @@ app.post('/api/truck-allocation/execute', async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Download Truck Allocation output file
+app.get('/api/truck-allocation/download/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const buffer = await storage.downloadFile('output/truck-allocation', filename);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+  } catch (error) {
+    res.status(404).send('File not found');
   }
 });
 
