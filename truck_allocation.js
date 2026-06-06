@@ -1006,9 +1006,8 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
       currentRow++; // Blank row separator
       
       // 2. Output Truck Allocations
-      for (const truck of truckPool) {
-        if (truck.items.length === 0) continue;
-        
+      const activeTrucks = truckPool.filter(t => t.items.length > 0);
+      for (const truck of activeTrucks) {
         for (const item of truck.items) {
           const destRow = newSheet.getRow(currentRow++);
           destRow.height = styleTemplateRow.height;
@@ -1025,7 +1024,10 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
             destCell.value = item.row[srcCol - 1] !== undefined ? item.row[srcCol - 1] : null;
           });
           
-          if (poColIdx !== -1) destRow.getCell(poColIdx).value = `${poName}_T${truck.id}`;
+          // Only add _T suffix when PO uses multiple trucks
+          if (poColIdx !== -1) {
+            destRow.getCell(poColIdx).value = activeTrucks.length > 1 ? `${poName}_T${truck.id}` : poName;
+          }
           if (pcsColIdx !== -1) destRow.getCell(pcsColIdx).value = item.pcs;
           if (cartonColIdx !== -1) destRow.getCell(cartonColIdx).value = item.cartons;
           if (weightColIdx !== -1) destRow.getCell(weightColIdx).value = item.weightPerCarton;
