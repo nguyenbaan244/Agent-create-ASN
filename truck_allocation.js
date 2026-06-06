@@ -605,9 +605,10 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
       const remaining = lines.map(l => ({ ...l, remainCartons: l.cartons, remainPcs: l.pcs }));
       
       // === B1: Volume-Priority Assignment ===
-      // Assign each line (biggest→smallest) to the truck with most remaining space.
+      // Assign each line (biggest→smallest) using BEST-FIT: smallest truck that fits.
+      // Large lines can only fit in large trucks → they naturally go there.
+      // Small lines fit in small trucks → they go there first.
       // If a line exceeds capacity, only take FULL PALLETS — never split odd.
-      // Don't aggressively fill/pair — keep trucks lean to minimize pick lines.
       
       for (const r of remaining) {
         if (r.remainCartons <= 0) continue;
@@ -616,10 +617,10 @@ async function execute(obBuffer, goodsSpecBuffer, config, version = 'v1') {
         const casePallet = skuSpec.casePallet || 0;
         const totalWeight = r.remainCartons * (r.weightPerCarton || 1);
         
-        // Find truck with MOST space that this SKU can go to
+        // Find truck with LEAST remaining space that can still fit this line (best-fit)
         let eligibleTrucks = truckPool
-          .filter(t => canAssignToTruck(r.sku, t.id) && (t.capacity - t.currentWeight) > 0)
-          .sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
+          .filter(t => canAssignToTruck(r.sku, t.id) && (t.capacity - t.currentWeight) >= (r.weightPerCarton || 1))
+          .sort((a, b) => (a.capacity - a.currentWeight) - (b.capacity - b.currentWeight));
         
         if (eligibleTrucks.length === 0) continue;
         const truck = eligibleTrucks[0];
