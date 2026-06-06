@@ -633,8 +633,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (btnRefreshTa) {
+    const confirmModal = document.getElementById('confirm-modal');
+    const btnYes = document.getElementById('btn-confirm-yes');
+    const btnNo = document.getElementById('btn-confirm-no');
+    
     btnRefreshTa.addEventListener('click', () => {
-      if (!confirm('Reset all Truck Allocation data?')) return;
+      confirmModal.classList.add('active');
+    });
+    
+    btnNo.addEventListener('click', () => {
+      confirmModal.classList.remove('active');
+    });
+    
+    btnYes.addEventListener('click', () => {
+      confirmModal.classList.remove('active');
       clearTaState();
       taFileUpload.value = '';
       taFileName.innerText = 'No file selected';
@@ -644,6 +656,11 @@ document.addEventListener('DOMContentLoaded', () => {
       btnDownloadTa.classList.add('hidden');
       const rc = document.getElementById('ta-results-container');
       if (rc) { rc.innerHTML = ''; rc.classList.add('hidden'); }
+    });
+    
+    // Close on backdrop click
+    confirmModal.addEventListener('click', (e) => {
+      if (e.target === confirmModal) confirmModal.classList.remove('active');
     });
   }
 

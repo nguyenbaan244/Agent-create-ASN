@@ -424,12 +424,20 @@
   <!-- Modal for Custom Confirm -->
   <div id="confirm-modal" class="modal">
     <div class="modal-content confirm-modal-content">
-      <div class="result-icon warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
-      <h2 id="confirm-title" style="margin-bottom: 12px;">Confirm Action</h2>
-      <p id="confirm-message" style="color: var(--text-muted);">Are you sure?</p>
+      <div class="confirm-icon-wrap">
+        <div class="confirm-icon-circle">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+      </div>
+      <h2 id="confirm-title">Confirm Reset</h2>
+      <p id="confirm-message">Are you sure you want to reset all Truck Allocation data? This action cannot be undone.</p>
       <div class="confirm-actions">
-        <button class="btn-primary btn-delete" id="btn-confirm-yes" style="font-size: 15px; padding: 10px 24px;">Confirm</button>
-        <button class="btn-primary" id="btn-confirm-no" style="font-size: 15px; padding: 10px 24px; background: #e2e8f0; color: #475569;">Cancel</button>
+        <button id="btn-confirm-no" class="confirm-btn confirm-btn-cancel">
+          <i class="fa-solid fa-xmark"></i> Cancel
+        </button>
+        <button id="btn-confirm-yes" class="confirm-btn confirm-btn-danger">
+          <i class="fa-solid fa-trash-can"></i> Reset All
+        </button>
       </div>
     </div>
   </div>
