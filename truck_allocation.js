@@ -308,8 +308,11 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         }
       }
 
-      // Sort by priority (descending)
-      lines.sort((a, b) => b.priorityScore - a.priorityScore);
+      // Sort by priority (descending), then by weight (descending) for optimal Bin Packing
+      lines.sort((a, b) => {
+         if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore;
+         return b.totalWeight - a.totalWeight;
+      });
 
       // Create trucks pool
       const truckPool = [];
@@ -322,105 +325,96 @@ async function execute(obBuffer, goodsSpecBuffer, config) {
         }
       }
 
-      // Pass 1: Prioritize loading ONLY FULL PALLETS for all lines
+      // Allocate lines to trucks with SKU-splitting minimization & load balancing
       for (const line of lines) {
         const skuSpec = spec.items[line.sku] || {};
         const casePallet = skuSpec.casePallet || 0;
         
-        line.remainingCartons = line.cartons;
-        line.remainingPcs = line.pcs;
+        let remainingCartons = line.cartons;
+        let remainingPcs = line.pcs;
         
-        if (!casePallet) continue;
+        // 1. Try to fit the ENTIRE line into a single truck to avoid splitting!
+        // Find all trucks that can fit the remaining load.
+        let candidateTrucks = truckPool.filter(t => (t.capacity - t.currentWeight) >= (remainingCartons * (line.weightPerCarton || 1)));
         
-        while (line.remainingCartons >= casePallet && truckPool.length > 0) {
-          // Find first truck with enough space for at least 1 FULL PALLET
-          const minWeightRequired = casePallet * (line.weightPerCarton || 1);
-          const truck = truckPool.find(t => (t.capacity - t.currentWeight) >= minWeightRequired);
-          if (!truck) break; // No truck can fit another full pallet of this SKU
-          
-          const availableWeight = truck.capacity - truck.currentWeight;
-          const maxPalletsCanFit = Math.floor(availableWeight / minWeightRequired);
-          const maxCartonsCanFit = maxPalletsCanFit * casePallet;
-          
-          const fullPalletsInLine = Math.floor(line.remainingCartons / casePallet);
-          const cartonsToLoad = Math.min(fullPalletsInLine * casePallet, maxCartonsCanFit);
-          
-          let pcsToLoad;
-          if (cartonsToLoad === line.remainingCartons) {
-             pcsToLoad = line.remainingPcs;
-          } else {
-             pcsToLoad = Math.round((cartonsToLoad / line.cartons) * line.pcs);
-          }
-          
-          const weightToLoad = cartonsToLoad * line.weightPerCarton;
-          
-          if (cartonsToLoad > 0) {
-             const existingItem = truck.items.find(i => i.row === line.row);
-             if (existingItem) {
-                existingItem.cartons += cartonsToLoad;
-                existingItem.pcs += pcsToLoad;
-                existingItem.totalWeight += weightToLoad;
-             } else {
-                truck.items.push({
-                  ...line,
-                  cartons: cartonsToLoad,
-                  pcs: pcsToLoad,
-                  totalWeight: weightToLoad
-                });
-             }
-             truck.currentWeight += weightToLoad;
-             line.remainingCartons -= cartonsToLoad;
-             line.remainingPcs -= pcsToLoad;
-          } else {
-             break;
-          }
+        if (candidateTrucks.length > 0) {
+           // Pick the truck with the MOST available space to balance loads
+           candidateTrucks.sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
+           const truck = candidateTrucks[0];
+           
+           truck.items.push({
+               ...line,
+               cartons: remainingCartons,
+               pcs: remainingPcs,
+               totalWeight: remainingCartons * line.weightPerCarton
+           });
+           truck.currentWeight += remainingCartons * line.weightPerCarton;
+           continue; // Done with this line!
+        }
+        
+        // 2. If it CANNOT fit entirely, we MUST split it.
+        // We will distribute it across trucks, picking the truck with MOST available space first.
+        while (remainingCartons > 0) {
+           // Sort all trucks by available space DESCENDING
+           truckPool.sort((a, b) => (b.capacity - b.currentWeight) - (a.capacity - a.currentWeight));
+           
+           let truck = truckPool.find(t => (t.capacity - t.currentWeight) >= (line.weightPerCarton || 1));
+           if (!truck) break; // Out of capacity across all trucks
+           
+           const availableSpace = truck.capacity - truck.currentWeight;
+           let cartonsToLoad = 0;
+           
+           if (casePallet > 0 && remainingCartons >= casePallet) {
+               // We have full pallets to allocate. Try to put full pallets into this truck.
+               const palletsCanFit = Math.floor(availableSpace / (casePallet * (line.weightPerCarton || 1)));
+               
+               if (palletsCanFit > 0) {
+                   const palletsToLoad = Math.min(palletsCanFit, Math.floor(remainingCartons / casePallet));
+                   cartonsToLoad = palletsToLoad * casePallet;
+               } else {
+                   // This truck cannot even fit 1 full pallet. Since we picked the truck with the MOST space,
+                   // NO truck can fit a full pallet anymore. We are forced to break pallets.
+                   cartonsToLoad = Math.floor(availableSpace / (line.weightPerCarton || 1));
+                   cartonsToLoad = Math.min(remainingCartons, cartonsToLoad);
+               }
+           } else {
+               // We only have odd cartons left, or the SKU doesn't have pallet info.
+               cartonsToLoad = Math.floor(availableSpace / (line.weightPerCarton || 1));
+               cartonsToLoad = Math.min(remainingCartons, cartonsToLoad);
+           }
+           
+           if (cartonsToLoad <= 0) break;
+           
+           let pcsToLoad;
+           if (cartonsToLoad === remainingCartons) {
+              pcsToLoad = remainingPcs;
+           } else {
+              pcsToLoad = Math.round((cartonsToLoad / line.cartons) * line.pcs);
+           }
+           const weightToLoad = cartonsToLoad * line.weightPerCarton;
+           
+           const existingItem = truck.items.find(i => i.row === line.row);
+           if (existingItem) {
+              existingItem.cartons += cartonsToLoad;
+              existingItem.pcs += pcsToLoad;
+              existingItem.totalWeight += weightToLoad;
+           } else {
+              truck.items.push({
+                 ...line,
+                 cartons: cartonsToLoad,
+                 pcs: pcsToLoad,
+                 totalWeight: weightToLoad
+              });
+           }
+           
+           truck.currentWeight += weightToLoad;
+           remainingCartons -= cartonsToLoad;
+           remainingPcs -= pcsToLoad;
         }
       }
-
-      // Pass 2: Allocate any remaining odd cartons to maximize payload
-      for (const line of lines) {
-        while (line.remainingCartons > 0 && truckPool.length > 0) {
-          // Find first truck with space for at least 1 carton
-          const truck = truckPool.find(t => (t.capacity - t.currentWeight) >= (line.weightPerCarton || 1));
-          if (!truck) break; // All trucks full for this item
-          
-          const availableWeight = truck.capacity - truck.currentWeight;
-          const maxCartonsCanFit = availableWeight / (line.weightPerCarton || 1);
-          
-          let cartonsToLoad = Math.floor(maxCartonsCanFit);
-          cartonsToLoad = Math.min(line.remainingCartons, cartonsToLoad);
-          
-          let pcsToLoad;
-          if (cartonsToLoad === line.remainingCartons) {
-             pcsToLoad = line.remainingPcs;
-          } else {
-             pcsToLoad = Math.round((cartonsToLoad / line.cartons) * line.pcs);
-          }
-          
-          const weightToLoad = cartonsToLoad * line.weightPerCarton;
-          
-          if (cartonsToLoad > 0) {
-             const existingItem = truck.items.find(i => i.row === line.row);
-             if (existingItem) {
-                existingItem.cartons += cartonsToLoad;
-                existingItem.pcs += pcsToLoad;
-                existingItem.totalWeight += weightToLoad;
-             } else {
-                truck.items.push({
-                  ...line,
-                  cartons: cartonsToLoad,
-                  pcs: pcsToLoad,
-                  totalWeight: weightToLoad
-                });
-             }
-             truck.currentWeight += weightToLoad;
-             line.remainingCartons -= cartonsToLoad;
-             line.remainingPcs -= pcsToLoad;
-          } else {
-             break;
-          }
-        }
-      }
+      
+      // Sort truckPool back by ID to preserve display order in the Excel sheet
+      truckPool.sort((a, b) => a.id - b.id);
 
       // Remove existing sheet with the same name if it exists in the original workbook
       const existingSheet = outWb.getWorksheet(poName);
