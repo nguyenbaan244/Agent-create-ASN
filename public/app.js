@@ -587,15 +587,63 @@ document.addEventListener('DOMContentLoaded', () => {
   let taPOs = [];
   let taHeaders = [];
   let taFilenameOnServer = '';
+  let taLastResults = null;
+  let taLastDownloadHref = '';
+
+  // --- localStorage persistence ---
+  function saveTaState() {
+    try {
+      localStorage.setItem('taState', JSON.stringify({
+        taPOs, taHeaders, taFilenameOnServer,
+        taLastResults, taLastDownloadHref
+      }));
+    } catch(e) { /* ignore quota errors */ }
+  }
+  function restoreTaState() {
+    try {
+      const raw = localStorage.getItem('taState');
+      if (!raw) return false;
+      const s = JSON.parse(raw);
+      taPOs = s.taPOs || [];
+      taHeaders = s.taHeaders || [];
+      taFilenameOnServer = s.taFilenameOnServer || '';
+      taLastResults = s.taLastResults || null;
+      taLastDownloadHref = s.taLastDownloadHref || '';
+      return taPOs.length > 0;
+    } catch(e) { return false; }
+  }
+  function clearTaState() {
+    localStorage.removeItem('taState');
+    taPOs = []; taHeaders = []; taFilenameOnServer = '';
+    taLastResults = null; taLastDownloadHref = '';
+  }
+
+  // Restore on page load
+  if (restoreTaState()) {
+    renderTaPOs();
+    taPoContainer.classList.remove('hidden');
+    taActions.classList.remove('hidden');
+    if (taLastResults) {
+      renderTaResults(taLastResults);
+    }
+    if (taLastDownloadHref) {
+      btnDownloadTa.href = taLastDownloadHref;
+      btnDownloadTa.classList.remove('hidden');
+    }
+  }
 
   if (btnRefreshTa) {
     btnRefreshTa.addEventListener('click', () => {
+      if (!confirm('Reset all Truck Allocation data?')) return;
+      clearTaState();
       taFileUpload.value = '';
       taFileName.innerText = 'No file selected';
       taPoContainer.classList.add('hidden');
       taActions.classList.add('hidden');
       taPoContainer.innerHTML = '';
       btnDownloadTa.classList.add('hidden');
+      const rc = document.getElementById('ta-results-container');
+      if (rc) { rc.innerHTML = ''; rc.classList.add('hidden'); }
     });
   }
 
@@ -624,10 +672,13 @@ document.addEventListener('DOMContentLoaded', () => {
           taPOs = data.pos;
           taFilenameOnServer = data.filename;
           taHeaders = data.headers || [];
+          taLastResults = null;
+          taLastDownloadHref = '';
           renderTaPOs();
           taPoContainer.classList.remove('hidden');
           taActions.classList.remove('hidden');
           btnDownloadTa.classList.add('hidden');
+          saveTaState();
         } else {
           showResultModal(false, 'Preview Failed', `<p>${data.error}</p>`);
         }
@@ -891,11 +942,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (data.success) {
           showResultModal(true, 'Allocation Complete', `<p>Trucks successfully allocated for ${data.posCount} POs.</p>`);
-          btnDownloadTa.href = `/api/download/${encodeURIComponent(data.outputFile)}`;
+          taLastDownloadHref = `/api/download/${encodeURIComponent(data.outputFile)}`;
+          btnDownloadTa.href = taLastDownloadHref;
           btnDownloadTa.classList.remove('hidden');
           if (data.allocationSummary) {
+            taLastResults = data.allocationSummary;
             renderTaResults(data.allocationSummary);
           }
+          saveTaState();
         } else {
           showResultModal(false, 'Allocation Failed', `<p>${data.error}</p>`);
         }
