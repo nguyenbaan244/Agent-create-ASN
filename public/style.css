@@ -849,6 +849,8 @@ tr:hover {
   font-size: 0.92rem;
   color: var(--text-main);
   cursor: default;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .ta-truck-badge {
   display: inline-flex;
@@ -872,19 +874,20 @@ tr:hover {
   color: var(--text-main);
 }
 .ta-utilization-bar {
-  width: 80px;
-  height: 6px;
+  width: 100px;
+  height: 8px;
   background: #e2e8f0;
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
   display: inline-block;
   vertical-align: middle;
-  margin-left: 8px;
+  margin-left: 6px;
 }
 .ta-utilization-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 4px;
   transition: width 0.5s ease;
+  min-width: 2px;
 }
 .ta-result-table {
   width: 100%;
