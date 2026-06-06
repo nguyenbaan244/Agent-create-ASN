@@ -643,6 +643,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const skusOptions = po.skus.map(sku => `<option value="${sku}">${sku}</option>`).join('');
       const batchesOptions = po.batches.map(b => `<option value="${b}">${b}</option>`).join('');
       
+      const hideCols = ['SO', 'Type', 'Request to DC', 'OB', 'Delivery date', 'Size Truck', 'Address', 'DN'];
+      const visibleHeaders = taHeaders.filter(h => !hideCols.includes(h));
       const thStyle = `padding: 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: #fff; background: linear-gradient(135deg, #4361ee, #5b6abf); white-space: nowrap;`;
       const numCols = ['Carton', 'Kg', 'PCS', 'Pcs', 'Weight', 'pcs'];
       
@@ -651,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <table style="width: 100%; border-collapse: collapse; font-size: 0.83rem;">
           <thead>
             <tr>
-              ${taHeaders.map(h => {
+              ${visibleHeaders.map(h => {
                 const isNum = numCols.some(n => h.includes(n));
                 return `<th style="${thStyle}${isNum ? ' text-align: right;' : ''}">${h}</th>`;
               }).join('')}
@@ -660,7 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <tbody>
             ${po.items.map(item => `
               <tr style="border-bottom: 1px solid #f1f5f9;">
-                ${taHeaders.map(h => {
+                ${visibleHeaders.map(h => {
                   const val = item[h] !== undefined ? item[h] : '';
                   const isNum = numCols.some(n => h.includes(n));
                   const isSku = h === 'SAP Code';
