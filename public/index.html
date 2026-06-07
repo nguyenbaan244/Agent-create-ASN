@@ -314,8 +314,11 @@
                    </label>
                  </div>
                  <a id="btn-download-ta" class="btn-primary hidden" style="text-decoration: none; background: #10b981;" download>
-                    <i class="fa-solid fa-download"></i> Download Excel
+                    <i class="fa-solid fa-download"></i> Download Allocation
                  </a>
+                 <button id="btn-generate-so" class="btn-primary hidden" style="background: #8b5cf6;">
+                   <i class="fa-solid fa-file-invoice"></i> Generate SO Files
+                 </button>
                  <button id="btn-execute-ta" class="btn-primary btn-large">
                    <i class="fa-solid fa-gears"></i> Process Allocation
                  </button>
@@ -323,6 +326,13 @@
 
               <!-- Allocation Results -->
               <div id="ta-results-container" class="hidden" style="margin-top: 24px;">
+              </div>
+
+              <!-- Generated SO Links -->
+              <div id="ta-so-links-container" class="hidden" style="margin-top: 24px; padding: 16px; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px;">
+                <h3 style="margin-bottom: 12px; color: #8b5cf6;"><i class="fa-solid fa-file-invoice"></i> Generated SO Files</h3>
+                <div id="ta-so-links" style="display: flex; flex-direction: column; gap: 8px;">
+                </div>
               </div>
             </div>
           </div>

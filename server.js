@@ -32,6 +32,7 @@ const inventoryAnalyzer = require('./inventory_analyze');
 const emptyLocation = require('./empty_location');
 const storage = require('./supabase-storage');
 const truckAllocation = require('./truck_allocation');
+const generateSOModule = require('./generate_so');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -396,6 +397,47 @@ app.get('/api/truck-allocation/download/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
     const buffer = await storage.downloadFile('output/truck-allocation', filename);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+  } catch (error) {
+    res.status(404).send('File not found');
+  }
+});
+
+// 16. Generate SO Files
+app.post('/api/truck-allocation/generate-so', async (req, res) => {
+  try {
+    const { filename, allocationSummary } = req.body;
+    if (!filename || !allocationSummary) {
+      return res.status(400).json({ success: false, error: 'Missing filename or allocationSummary' });
+    }
+
+    // Download OB Request buffer
+    const obBuffer = await storage.downloadFile(storage.FOLDERS.inputOutbound || 'input/outbound', filename);
+    
+    // Generate SO files locally
+    const generatedFiles = await generateSOModule.generateSO(allocationSummary, obBuffer);
+    
+    // Upload files to Supabase 'output/so' folder
+    const outputFiles = [];
+    for (const file of generatedFiles) {
+      await storage.uploadFile('output/so', file.filename, file.buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      outputFiles.push(file.filename);
+    }
+    
+    res.json({ success: true, files: outputFiles });
+  } catch (error) {
+    console.error('Error generating SO:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 17. Download SO File
+app.get('/api/truck-allocation/download-so/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const buffer = await storage.downloadFile('output/so', filename);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);

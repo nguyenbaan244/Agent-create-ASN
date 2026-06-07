@@ -589,13 +589,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let taFilenameOnServer = '';
   let taLastResults = null;
   let taLastDownloadHref = '';
+  let taLastSOFiles = [];
 
   // --- localStorage persistence ---
   function saveTaState() {
     try {
       localStorage.setItem('taState', JSON.stringify({
         taPOs, taHeaders, taFilenameOnServer,
-        taLastResults, taLastDownloadHref
+        taLastResults, taLastDownloadHref, taLastSOFiles
       }));
     } catch(e) { /* ignore quota errors */ }
   }
@@ -609,6 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
       taFilenameOnServer = s.taFilenameOnServer || '';
       taLastResults = s.taLastResults || null;
       taLastDownloadHref = s.taLastDownloadHref || '';
+      taLastSOFiles = s.taLastSOFiles || [];
       return taPOs.length > 0;
     } catch(e) { return false; }
   }
@@ -616,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('taState');
     taPOs = []; taHeaders = []; taFilenameOnServer = '';
     taLastResults = null; taLastDownloadHref = '';
+    taLastSOFiles = [];
   }
 
   // Restore on page load
@@ -629,6 +632,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (taLastDownloadHref) {
       btnDownloadTa.href = taLastDownloadHref;
       btnDownloadTa.classList.remove('hidden');
+      const btnGenerateSO = document.getElementById('btn-generate-so');
+      if (btnGenerateSO) btnGenerateSO.classList.remove('hidden');
+    }
+    if (taLastSOFiles && taLastSOFiles.length > 0) {
+      renderSOLinks(taLastSOFiles);
     }
   }
 
@@ -658,6 +666,10 @@ document.addEventListener('DOMContentLoaded', () => {
       taActions.classList.add('hidden');
       taPoContainer.innerHTML = '';
       btnDownloadTa.classList.add('hidden');
+      const btnGenerateSO = document.getElementById('btn-generate-so');
+      if (btnGenerateSO) btnGenerateSO.classList.add('hidden');
+      const soContainer = document.getElementById('ta-so-links-container');
+      if (soContainer) soContainer.classList.add('hidden');
       // Reset algorithm to V2
       const v2Radio = document.querySelector('input[name="ta-version"][value="v2"]');
       if (v2Radio) v2Radio.checked = true;
@@ -698,10 +710,15 @@ document.addEventListener('DOMContentLoaded', () => {
           taHeaders = data.headers || [];
           taLastResults = null;
           taLastDownloadHref = '';
+          taLastSOFiles = [];
           renderTaPOs();
           taPoContainer.classList.remove('hidden');
           taActions.classList.remove('hidden');
           btnDownloadTa.classList.add('hidden');
+          const btnGenerateSO = document.getElementById('btn-generate-so');
+          if (btnGenerateSO) btnGenerateSO.classList.add('hidden');
+          const soContainer = document.getElementById('ta-so-links-container');
+          if (soContainer) soContainer.classList.add('hidden');
           saveTaState();
         } else {
           showResultModal(false, 'Preview Failed', `<p>${data.error}</p>`);
@@ -973,6 +990,10 @@ document.addEventListener('DOMContentLoaded', () => {
           taLastDownloadHref = `/api/truck-allocation/download/${encodeURIComponent(data.outputFile)}`;
           btnDownloadTa.href = taLastDownloadHref;
           btnDownloadTa.classList.remove('hidden');
+          
+          const btnGenerateSO = document.getElementById('btn-generate-so');
+          if (btnGenerateSO) btnGenerateSO.classList.remove('hidden');
+          
           if (data.allocationSummary) {
             taLastResults = data.allocationSummary;
             renderTaResults(data.allocationSummary);
@@ -986,6 +1007,59 @@ document.addEventListener('DOMContentLoaded', () => {
         showResultModal(false, 'Execution Error', `<p>${err.message}</p>`);
       }
     });
+  }
+
+  // Handle Generate SO click
+  const btnGenerateSO = document.getElementById('btn-generate-so');
+  if (btnGenerateSO) {
+    btnGenerateSO.addEventListener('click', async () => {
+      if (!taFilenameOnServer || !taLastResults) return;
+
+      loadingModal.classList.add('active');
+      document.getElementById('loading-text').innerText = 'Generating SO files...';
+
+      try {
+        const res = await fetch('/api/truck-allocation/generate-so', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: taFilenameOnServer, allocationSummary: taLastResults })
+        });
+        const data = await res.json();
+
+        loadingModal.classList.remove('active');
+
+        if (data.success) {
+          taLastSOFiles = data.files;
+          renderSOLinks(data.files);
+          saveTaState();
+          showResultModal(true, 'Generation Complete', `<p>Successfully generated ${data.files.length} SO files.</p>`);
+        } else {
+          showResultModal(false, 'Generation Failed', `<p>${data.error}</p>`);
+        }
+      } catch (err) {
+        loadingModal.classList.remove('active');
+        showResultModal(false, 'Execution Error', `<p>${err.message}</p>`);
+      }
+    });
+  }
+
+  function renderSOLinks(files) {
+    const container = document.getElementById('ta-so-links-container');
+    const linksDiv = document.getElementById('ta-so-links');
+    if (!container || !linksDiv || !files || files.length === 0) return;
+
+    linksDiv.innerHTML = files.map(file => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;">
+        <span style="font-weight: 500; display: flex; align-items: center; gap: 8px;">
+          <i class="fa-regular fa-file-excel" style="color: #8b5cf6;"></i> ${file}
+        </span>
+        <a href="/api/truck-allocation/download-so/${encodeURIComponent(file)}" class="btn-sm btn-primary" style="text-decoration: none; background: #8b5cf6;" download>
+          <i class="fa-solid fa-download"></i> Download
+        </a>
+      </div>
+    `).join('');
+    
+    container.classList.remove('hidden');
   }
 
 });
