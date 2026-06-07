@@ -142,7 +142,8 @@ async function generateSO(allocationSummary, obBuffer) {
 
       const suffix = multiTruck ? `_T${t + 1}` : '';
       const orderKey = `${poName}${suffix}`;
-      const filename = `Template SO ${orderKey}.xlsx`;
+      const nppSuffix = npp.code ? `_${npp.code}` : '';
+      const filename = `Template SO ${orderKey}${nppSuffix}.xlsx`;
 
       // Load Template SO using ExcelJS to preserve formatting
       const wb = new ExcelJS.Workbook();
