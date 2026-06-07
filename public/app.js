@@ -1043,6 +1043,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Handle Download All SO files
+  const btnDownloadAllSo = document.getElementById('btn-download-all-so');
+  if (btnDownloadAllSo) {
+    btnDownloadAllSo.addEventListener('click', () => {
+      if (!taLastSOFiles || taLastSOFiles.length === 0) return;
+      
+      let delay = 0;
+      taLastSOFiles.forEach(file => {
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = `/api/truck-allocation/download-so/${encodeURIComponent(file)}`;
+          a.download = file;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }, delay);
+        delay += 500; // stagger downloads by 500ms to prevent browser blocking
+      });
+    });
+  }
+
   function renderSOLinks(files) {
     const container = document.getElementById('ta-so-links-container');
     const linksDiv = document.getElementById('ta-so-links');
