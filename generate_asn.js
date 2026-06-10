@@ -140,7 +140,7 @@ function parsePDFA(text, logger) {
     products: [],
   };
 
-  const motherDNMatch = text.match(/Mother DN No\s+(\d+)/);
+  const motherDNMatch = text.match(/Mother DN No\s+(\d{10})/);
   if (motherDNMatch) {
     result.motherDNNo = motherDNMatch[1];
     logger.log('EXTRACT_PDF', `Mother DN No: ${result.motherDNNo}`);
@@ -152,10 +152,18 @@ function parsePDFA(text, logger) {
     logger.log('EXTRACT_PDF', `License Plate: ${result.licensePlate}`);
   }
 
-  const poMatch = text.match(/PO\/STO No\s+(\d+)/);
+  // Try to match PO/STO No strictly (exactly 10 digits right after label)
+  const poMatch = text.match(/PO\/STO No\s{0,10}(\d{10})(?!\d)/);
   if (poMatch) {
     result.poStoNo = poMatch[1];
     logger.log('EXTRACT_PDF', `PO/STO No: ${result.poStoNo}`);
+  } else {
+    // Fallback: Customer SO Ref has same value as PO/STO No
+    const soRefMatch = text.match(/Customer SO Ref\s{0,10}(\d{10})(?!\d)/);
+    if (soRefMatch) {
+      result.poStoNo = soRefMatch[1];
+      logger.log('EXTRACT_PDF', `PO/STO No (via Customer SO Ref): ${result.poStoNo}`);
+    }
   }
 
   const productPattern = /00(\d{6})\s+([A-Z\s,\d]+?)\s+\d+\s+([\d\s]+)\s*TR\s+([\d.]+)\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d+)/g;
