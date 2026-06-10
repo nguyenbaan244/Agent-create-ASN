@@ -140,7 +140,7 @@ function parsePDFA(text, logger) {
     products: [],
   };
 
-  const motherDNMatch = text.match(/(\d{10,})\s+TU Id/);
+  const motherDNMatch = text.match(/Mother DN No\s+(\d+)/);
   if (motherDNMatch) {
     result.motherDNNo = motherDNMatch[1];
     logger.log('EXTRACT_PDF', `Mother DN No: ${result.motherDNNo}`);
@@ -152,7 +152,7 @@ function parsePDFA(text, logger) {
     logger.log('EXTRACT_PDF', `License Plate: ${result.licensePlate}`);
   }
 
-  const poMatch = text.match(/PO\/STO No.*?(\d{10,})/s);
+  const poMatch = text.match(/PO\/STO No\s+(\d+)/);
   if (poMatch) {
     result.poStoNo = poMatch[1];
     logger.log('EXTRACT_PDF', `PO/STO No: ${result.poStoNo}`);
@@ -424,10 +424,10 @@ async function generateASN({ pdfBuffers, inventoryBuffer, goodsSpecBuffer, maste
         };
         const cvt = (d) => { const p = d.split('/'); return `${p[2]}/${p[1]}/${p[0]}`; };
         
-        set('ExternReceiptkey', headerData.poStoNo);
+        set('ExternReceiptkey', headerData.motherDNNo);
         set('Storerkey', 'DANONE');
         set('ContainerKey', headerData.licensePlate);
-        set('Signatory', headerData.motherDNNo);
+        set('Signatory', headerData.poStoNo);
         set('RECType', 'Normal');
         set('Facility', 'DAN1');
         set('DOCTYPE', 'A');
