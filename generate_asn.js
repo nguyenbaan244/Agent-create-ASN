@@ -140,33 +140,31 @@ function parsePDFA(text, logger) {
     products: [],
   };
 
-  // DEBUG: log raw text and all 10-digit numbers found
-  logger.log('DEBUG_RAW_TEXT', text.replace(/\n/g, '|').substring(0, 800));
-  const allNums = [...text.matchAll(/(\d{10,})/g)].map(m => m[1]);
-  logger.log('DEBUG_ALL_NUMS', allNums.join(', '));
+  // PDF text puts all labels in one block, values in another block (not side-by-side).
+  // Strategy: find TU Id value (the 10-digit number right before "TU Id"),
+  // then collect all 10-digit numbers that appear BEFORE that TU Id block.
+  // Order in PDF text: Mother DN No (1st), PO/STO No (2nd), TU Id (3rd).
+  const tuIdMatch = text.match(/(\d{10})\s+TU Id/);
+  if (tuIdMatch) {
+    const tuIdPos = text.indexOf(tuIdMatch[0]);
+    const textBeforeTuId = text.substring(0, tuIdPos);
+    const numsBefore = [...textBeforeTuId.matchAll(/\b(\d{10})\b/g)].map(m => m[1]);
+    logger.log('DEBUG_NUMS_BEFORE_TUID', numsBefore.join(', '));
 
-  const motherDNMatch = text.match(/Mother[\s\S]{0,20}DN[\s\S]{0,20}No[\s\S]{0,30}(\d{10})(?!\d)/);
-  if (motherDNMatch) {
-    result.motherDNNo = motherDNMatch[1];
-    logger.log('EXTRACT_PDF', `Mother DN No: ${result.motherDNNo}`);
+    if (numsBefore.length >= 1) {
+      result.motherDNNo = numsBefore[0];
+      logger.log('EXTRACT_PDF', `Mother DN No: ${result.motherDNNo}`);
+    }
+    if (numsBefore.length >= 2) {
+      result.poStoNo = numsBefore[1];
+      logger.log('EXTRACT_PDF', `PO/STO No: ${result.poStoNo}`);
+    }
   }
 
   const conMatch = text.match(/Con#(\w+)/);
   if (conMatch) {
     result.licensePlate = conMatch[1];
     logger.log('EXTRACT_PDF', `License Plate: ${result.licensePlate}`);
-  }
-
-  const poMatch = text.match(/PO[\s\S]{0,10}STO[\s\S]{0,10}No[\s\S]{0,30}(\d{10})(?!\d)/);
-  if (poMatch) {
-    result.poStoNo = poMatch[1];
-    logger.log('EXTRACT_PDF', `PO/STO No: ${result.poStoNo}`);
-  } else {
-    const soRefMatch = text.match(/Customer[\s\S]{0,10}SO[\s\S]{0,10}Ref[\s\S]{0,30}(\d{10})(?!\d)/);
-    if (soRefMatch) {
-      result.poStoNo = soRefMatch[1];
-      logger.log('EXTRACT_PDF', `PO/STO No (via Customer SO Ref): ${result.poStoNo}`);
-    }
   }
 
   const productPattern = /00(\d{6})\s+([A-Z\s,\d]+?)\s+\d+\s+([\d\s]+)\s*TR\s+([\d.]+)\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d+)/g;
