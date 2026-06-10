@@ -98,6 +98,7 @@ async function extractPDFData(pdfBuffers, logger) {
     logger.log('EXTRACT_PDF', `Processing container: ${containerNo}`);
     
     let pdfAText = '';
+    let pdfAItems = null;  // text items with x,y positions (PDF A only)
     let pdfBText = '';
     
     for (const { filename, buffer } of files.sort((a, b) => a.filename.localeCompare(b.filename))) {
@@ -105,14 +106,28 @@ async function extractPDFData(pdfBuffers, logger) {
       const doc = await getDocument({ data }).promise;
       
       let fullText = '';
+      let collectedItems = [];
       for (let p = 1; p <= doc.numPages; p++) {
         const page = await doc.getPage(p);
         const tc = await page.getTextContent();
         fullText += tc.items.map(item => item.str).join(' ') + '\n';
+        // Collect positioned items for PDF A
+        if (filename.includes('A.pdf') || filename.endsWith('A.pdf')) {
+          for (const item of tc.items) {
+            if (item.str.trim()) {
+              collectedItems.push({
+                str: item.str,
+                x: item.transform[4],
+                y: item.transform[5],
+              });
+            }
+          }
+        }
       }
       
       if (filename.includes('A.pdf') || filename.endsWith('A.pdf')) {
         pdfAText = fullText;
+        pdfAItems = collectedItems;
         logger.log('EXTRACT_PDF', `Read PDF A: ${filename} (${doc.numPages} pages)`);
       } else if (filename.includes('B.pdf') || filename.endsWith('B.pdf')) {
         pdfBText = fullText;
@@ -120,7 +135,7 @@ async function extractPDFData(pdfBuffers, logger) {
       }
     }
 
-    const headerData = parsePDFA(pdfAText, logger);
+    const headerData = parsePDFA(pdfAText, pdfAItems, logger);
     headerData.containerNo = containerNo;
     const pallets = parsePDFB(pdfBText, headerData, logger);
     results.push({ headerData, pallets, containerNo });
@@ -132,7 +147,7 @@ async function extractPDFData(pdfBuffers, logger) {
 // ============================================================
 // PARSE PDF A (summary/header)
 // ============================================================
-function parsePDFA(text, logger) {
+function parsePDFA(text, items, logger) {
   const result = {
     motherDNNo: '',
     licensePlate: '',
@@ -140,33 +155,77 @@ function parsePDFA(text, logger) {
     products: [],
   };
 
-  // PDF text puts all labels in one block, values in another block (not side-by-side).
-  // Strategy: find TU Id value (the 10-digit number right before "TU Id"),
-  // then collect all 10-digit numbers that appear BEFORE that TU Id block.
-  // Order in PDF text: Mother DN No (1st), PO/STO No (2nd), TU Id (3rd).
-  const tuIdMatch = text.match(/(\d{10})\s+TU Id/);
-  if (tuIdMatch) {
-    const tuIdPos = text.indexOf(tuIdMatch[0]);
-    const textBeforeTuId = text.substring(0, tuIdPos);
-    const numsBefore = [...textBeforeTuId.matchAll(/\b(\d{10})\b/g)].map(m => m[1]);
-    logger.log('DEBUG_NUMS_BEFORE_TUID', numsBefore.join(', '));
-
-    if (numsBefore.length >= 1) {
-      result.motherDNNo = numsBefore[0];
-      logger.log('EXTRACT_PDF', `Mother DN No: ${result.motherDNNo}`);
+  // ── Strategy 1: Position-based row reconstruction ────────────────────────
+  // pdfjs returns each text item with x,y coordinates.
+  // We group items by y-coordinate (rounded to nearest 5pt) to reconstruct
+  // visual rows, then search for labels within each row.
+  // This is robust regardless of content-stream ordering.
+  if (items && items.length > 0) {
+    const rowBuckets = {};
+    for (const item of items) {
+      const yKey = String(Math.round(item.y / 5) * 5);
+      if (!rowBuckets[yKey]) rowBuckets[yKey] = [];
+      rowBuckets[yKey].push(item);
     }
-    if (numsBefore.length >= 2) {
-      result.poStoNo = numsBefore[1];
-      logger.log('EXTRACT_PDF', `PO/STO No: ${result.poStoNo}`);
+    // Sort rows top-to-bottom (PDF y=0 is bottom, so larger y = higher on page)
+    const sortedRows = Object.entries(rowBuckets)
+      .sort(([ya], [yb]) => Number(yb) - Number(ya))
+      .map(([, rowItems]) =>
+        rowItems.sort((a, b) => a.x - b.x).map(i => i.str).join(' ')
+      );
+
+    logger.log('DEBUG_ROWS', sortedRows.slice(0, 25).join(' || ').substring(0, 600));
+
+    for (const row of sortedRows) {
+      // Match "Mother DN No  5068729826" — label and value on the SAME row
+      if (!result.motherDNNo) {
+        const m = row.match(/Mother\s+DN\s+No\s+(\d{10})(?!\d)/);
+        if (m) {
+          result.motherDNNo = m[1];
+          logger.log('EXTRACT_PDF', `Mother DN No (position-based): ${result.motherDNNo}`);
+        }
+      }
+      // Match "PO/STO No  4505590424"
+      if (!result.poStoNo) {
+        const p = row.match(/PO\s*\/\s*STO\s+No\s+(\d{10})(?!\d)/);
+        if (p) {
+          result.poStoNo = p[1];
+          logger.log('EXTRACT_PDF', `PO/STO No (position-based): ${result.poStoNo}`);
+        }
+      }
     }
   }
 
+  // ── Strategy 2: TU Id position fallback ─────────────────────────────────
+  // If position-based failed (e.g. PDF structure changed), fall back to
+  // finding the two 10-digit numbers that appear before "TU Id" in flat text.
+  if (!result.motherDNNo || !result.poStoNo) {
+    logger.log('WARNING', 'Position-based extraction incomplete — using TU Id fallback');
+    const tuIdMatch = text.match(/(\d{10})\s+TU Id/);
+    if (tuIdMatch) {
+      const tuIdPos = text.indexOf(tuIdMatch[0]);
+      const before = text.substring(0, tuIdPos);
+      const nums = [...before.matchAll(/\b(\d{10})\b/g)].map(m => m[1]);
+      logger.log('DEBUG_FALLBACK_NUMS', nums.join(', '));
+      if (!result.motherDNNo && nums.length >= 1) {
+        result.motherDNNo = nums[0];
+        logger.log('EXTRACT_PDF', `Mother DN No (fallback): ${result.motherDNNo}`);
+      }
+      if (!result.poStoNo && nums.length >= 2) {
+        result.poStoNo = nums[1];
+        logger.log('EXTRACT_PDF', `PO/STO No (fallback): ${result.poStoNo}`);
+      }
+    }
+  }
+
+  // ── License plate ─────────────────────────────────────────────────────────
   const conMatch = text.match(/Con#(\w+)/);
   if (conMatch) {
     result.licensePlate = conMatch[1];
     logger.log('EXTRACT_PDF', `License Plate: ${result.licensePlate}`);
   }
 
+  // ── Product lines ─────────────────────────────────────────────────────────
   const productPattern = /00(\d{6})\s+([A-Z\s,\d]+?)\s+\d+\s+([\d\s]+)\s*TR\s+([\d.]+)\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d+)/g;
   let match;
   while ((match = productPattern.exec(text)) !== null) {
