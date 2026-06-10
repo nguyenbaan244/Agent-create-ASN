@@ -424,10 +424,10 @@ async function generateASN({ pdfBuffers, inventoryBuffer, goodsSpecBuffer, maste
         };
         const cvt = (d) => { const p = d.split('/'); return `${p[2]}/${p[1]}/${p[0]}`; };
         
-        set('ExternReceiptkey', headerData.motherDNNo);
+        set('ExternReceiptkey', headerData.poStoNo);
         set('Storerkey', 'DANONE');
         set('ContainerKey', headerData.licensePlate);
-        set('Signatory', headerData.poStoNo);
+        set('Signatory', headerData.motherDNNo);
         set('RECType', 'Normal');
         set('Facility', 'DAN1');
         set('DOCTYPE', 'A');
