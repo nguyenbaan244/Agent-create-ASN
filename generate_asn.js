@@ -140,7 +140,12 @@ function parsePDFA(text, logger) {
     products: [],
   };
 
-  const motherDNMatch = text.match(/Mother DN No\s+(\d{10})/);
+  // DEBUG: log raw text and all 10-digit numbers found
+  logger.log('DEBUG_RAW_TEXT', text.replace(/\n/g, '|').substring(0, 800));
+  const allNums = [...text.matchAll(/(\d{10,})/g)].map(m => m[1]);
+  logger.log('DEBUG_ALL_NUMS', allNums.join(', '));
+
+  const motherDNMatch = text.match(/Mother[\s\S]{0,20}DN[\s\S]{0,20}No[\s\S]{0,30}(\d{10})(?!\d)/);
   if (motherDNMatch) {
     result.motherDNNo = motherDNMatch[1];
     logger.log('EXTRACT_PDF', `Mother DN No: ${result.motherDNNo}`);
@@ -152,14 +157,12 @@ function parsePDFA(text, logger) {
     logger.log('EXTRACT_PDF', `License Plate: ${result.licensePlate}`);
   }
 
-  // Try to match PO/STO No strictly (exactly 10 digits right after label)
-  const poMatch = text.match(/PO\/STO No\s{0,10}(\d{10})(?!\d)/);
+  const poMatch = text.match(/PO[\s\S]{0,10}STO[\s\S]{0,10}No[\s\S]{0,30}(\d{10})(?!\d)/);
   if (poMatch) {
     result.poStoNo = poMatch[1];
     logger.log('EXTRACT_PDF', `PO/STO No: ${result.poStoNo}`);
   } else {
-    // Fallback: Customer SO Ref has same value as PO/STO No
-    const soRefMatch = text.match(/Customer SO Ref\s{0,10}(\d{10})(?!\d)/);
+    const soRefMatch = text.match(/Customer[\s\S]{0,10}SO[\s\S]{0,10}Ref[\s\S]{0,30}(\d{10})(?!\d)/);
     if (soRefMatch) {
       result.poStoNo = soRefMatch[1];
       logger.log('EXTRACT_PDF', `PO/STO No (via Customer SO Ref): ${result.poStoNo}`);
